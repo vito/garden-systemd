@@ -1,19 +1,21 @@
 # THE PLAN
 
-* each container has its own working directory
+* each container is a stripped-down wshd running as a systemd service
 
-* stream in/out are relative to this directory
+* running processes behaves the same as garden linux (wsh <-> wshd)
 
-* running processes are relative to this directory
+* container rootfs is initialized via machinectl clone, providing efficient
+  copy-on-write. currently this only works on btrfs.
 
-* containers are not isolated beyond that
+* docker images will be supported via a `machinectl pull-dkr`
 
-* don't use this in a multitentant environment
-    * seriously
+* stream in/out will have to have an extra step for the tar/untarring, since
+  systemd only supports copying dirs local to the server, and doing bind-mounts
 
-* when a container is stopped or destroyed, all of its processes are killed
+* dynamic volumes api may be supported in the future via `machinectl bind`
 
-* does not implement snapshotting (yet?)
+* currently, a regular container user is not created. this theoretically would
+  be done the same as it is in garden (useradd -R with root image)
 
-* limits and most other Garden calls are not supported (e.g. networking
-  configuration)
+* side-goal: push as much state as possible out of the server itself and into
+  systemd? eg, get snapshotting for "free"
