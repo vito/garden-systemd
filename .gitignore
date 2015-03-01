@@ -1,4 +1,4 @@
-/skeleton
+/skeleton/bin
 /init/wsh
 /init/wshd
 /init/*.o

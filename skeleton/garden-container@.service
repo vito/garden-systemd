@@ -1,0 +1,6 @@
+[Unit]
+Description=Garden Container %I
+
+[Service]
+ExecStart=/usr/bin/systemd-nspawn --machine=%I --quiet --keep-unit --bind /run/garden/container-%I/run:/tmp/garden-init -- /sbin/init --run /tmp/garden-init
+ExecStop=/usr/bin/machinectl kill --signal=SIGKILL %I
