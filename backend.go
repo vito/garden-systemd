@@ -3,11 +3,14 @@ package gardensystemd
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"log"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -81,11 +84,60 @@ func (backend *Backend) Create(spec garden.ContainerSpec) (garden.Container, err
 		spec.Handle = id
 	}
 
+	rootfs, err := url.Parse(spec.RootFSPath)
+	if err != nil {
+		return nil, err
+	}
+
+	var image string
+	switch rootfs.Scheme {
+	case "docker":
+		dockerIndex := "https://index.docker.io"
+		if rootfs.Host != "" {
+			dockerIndex = "https://" + rootfs.Host
+		}
+
+		tag := "latest"
+		if rootfs.Fragment != "" {
+			tag = rootfs.Fragment
+		}
+
+		var repo string
+		pathSegs := strings.Split(rootfs.Path, "/")
+		if len(pathSegs) == 0 {
+			return nil, fmt.Errorf("invalid docker uri")
+		}
+
+		// drop leading /
+		pathSegs = pathSegs[1:]
+		if len(pathSegs) == 1 {
+			repo = "library/" + pathSegs[0]
+		} else {
+			repo = strings.Join(pathSegs, "/")
+		}
+
+		err := run(exec.Command(
+			"machinectl",
+			"pull-dkr",
+			repo+":"+tag,
+			"--force",
+			"--verify", "no",
+			"--dkr-index-url", dockerIndex,
+		))
+		if err != nil {
+			return nil, err
+		}
+
+		image = filepath.Base(rootfs.Path)
+	default:
+		return nil, fmt.Errorf("unsupported rootfs scheme: %s", rootfs.Scheme)
+	}
+
 	dir := filepath.Join(backend.containersDir, "container-"+id)
 
 	container := newContainer(spec, dir, id)
 
-	err := os.MkdirAll(dir, 0755)
+	err = os.MkdirAll(dir, 0755)
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +153,13 @@ func (backend *Backend) Create(spec garden.ContainerSpec) (garden.Container, err
 		return nil, err
 	}
 
-	err = run(exec.Command("machinectl", "clone", spec.RootFSPath, id))
+	err = run(exec.Command("machinectl", "clone", image, id))
+	if err != nil {
+		return nil, err
+	}
+
+	// clear out any existing resolv.conf
+	err = os.RemoveAll(filepath.Join("/var/lib/machines", id, "etc", "resolv.conf"))
 	if err != nil {
 		return nil, err
 	}
