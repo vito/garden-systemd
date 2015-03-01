@@ -92,6 +92,21 @@ func (backend *Backend) Create(spec garden.ContainerSpec) (garden.Container, err
 	var image string
 	switch rootfs.Scheme {
 	case "docker":
+		image = filepath.Base(rootfs.Path)
+
+		err := run(exec.Command(
+			"machinectl",
+			"image-status",
+			image,
+		))
+		if err == nil {
+			// image already fetched
+
+			// ideally --force would be atomic, so we can always fetch and make
+			// sure the patch is warm
+			break
+		}
+
 		dockerIndex := "https://index.docker.io"
 		if rootfs.Host != "" {
 			dockerIndex = "https://" + rootfs.Host
@@ -116,19 +131,16 @@ func (backend *Backend) Create(spec garden.ContainerSpec) (garden.Container, err
 			repo = strings.Join(pathSegs, "/")
 		}
 
-		err := run(exec.Command(
+		err = run(exec.Command(
 			"machinectl",
 			"pull-dkr",
 			repo+":"+tag,
-			"--force",
 			"--verify", "no",
 			"--dkr-index-url", dockerIndex,
 		))
 		if err != nil {
 			return nil, err
 		}
-
-		image = filepath.Base(rootfs.Path)
 	default:
 		return nil, fmt.Errorf("unsupported rootfs scheme: %s", rootfs.Scheme)
 	}
