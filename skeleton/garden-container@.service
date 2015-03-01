@@ -3,4 +3,8 @@ Description=Garden Container %I
 
 [Service]
 ExecStart=/usr/bin/systemd-nspawn --machine=%I --quiet --keep-unit --bind /run/garden/container-%I/run:/tmp/garden-init -- /sbin/wshd --run /tmp/garden-init
-ExecStop=/usr/bin/machinectl kill --signal=SIGKILL %I
+Type=notify
+KillMode=mixed
+TimeoutStopSec=10
+SuccessExitStatus=0 1
+Delegate=yes
