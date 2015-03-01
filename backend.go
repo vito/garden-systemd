@@ -200,6 +200,27 @@ func (backend *Backend) Create(spec garden.ContainerSpec) (garden.Container, err
 		return nil, err
 	}
 
+	for i := 0; i < 10; i++ {
+		err := run(exec.Command("machinectl", "status", id))
+		if err == nil {
+			break
+		}
+
+		time.Sleep(time.Second)
+	}
+
+	if err != nil {
+		if err := run(exec.Command("systemctl", "stop", "garden-container@"+id)); err != nil {
+			log.Println("failed to cleanup container:", err)
+		}
+
+		if err := run(exec.Command("machinectl", "remove", id)); err != nil {
+			log.Println("failed to cleanup image:", err)
+		}
+
+		return nil, fmt.Errorf("container did not come up")
+	}
+
 	backend.containersL.Lock()
 	backend.containers[spec.Handle] = container
 	backend.containersL.Unlock()
