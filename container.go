@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"os"
 	"os/exec"
 	"path"
 	"path/filepath"
@@ -124,14 +125,31 @@ func (container *container) StreamOut(srcPath string) (io.ReadCloser, error) {
 		return nil, err
 	}
 
+	tarCmd.Stderr = os.Stderr
+
 	err = tarCmd.Start()
 	if err != nil {
 		return nil, err
 	}
 
-	go tarCmd.Wait()
+	return waitCloser{
+		ReadCloser: out,
+		proc:       tarCmd,
+	}, nil
+}
 
-	return out, nil
+type waitCloser struct {
+	io.ReadCloser
+	proc *exec.Cmd
+}
+
+func (c waitCloser) Close() error {
+	err := c.Close()
+	if err != nil {
+		return err
+	}
+
+	return c.proc.Wait()
 }
 
 func (container *container) LimitBandwidth(limits garden.BandwidthLimits) error { return nil }
