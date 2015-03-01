@@ -3,8 +3,9 @@ package gardensystemd
 import (
 	"fmt"
 	"io"
-	"os"
+	"io/ioutil"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -74,9 +75,7 @@ func (container *container) Stop(kill bool) error {
 func (container *container) Info() (garden.ContainerInfo, error) { return garden.ContainerInfo{}, nil }
 
 func (container *container) StreamIn(dstPath string, tarStream io.Reader) error {
-	streamDir := filepath.Join(container.dir, "stream-in", dstPath)
-
-	err := os.MkdirAll(streamDir, 0755)
+	streamDir, err := ioutil.TempDir(container.dir, "stream-in")
 	if err != nil {
 		return err
 	}
@@ -97,26 +96,28 @@ func (container *container) StreamIn(dstPath string, tarStream io.Reader) error 
 }
 
 func (container *container) StreamOut(srcPath string) (io.ReadCloser, error) {
-	streamDir := filepath.Join(container.dir, "stream-out", srcPath)
-
-	err := os.MkdirAll(streamDir, 0755)
+	streamDirBase, err := ioutil.TempDir(container.dir, "stream-out")
 	if err != nil {
 		return nil, err
 	}
+
+	// do NOT use path.Join; it strips out '/.'
+	streamDir := streamDirBase + "/" + path.Base(srcPath)
 
 	err = run(exec.Command("machinectl", "copy-from", container.id, srcPath, streamDir))
 	if err != nil {
 		return nil, err
 	}
 
-	workingDir := filepath.Dir(streamDir)
-	compressArg := filepath.Base(streamDir)
+	workingDir := path.Dir(streamDir)
+	compressArg := path.Base(streamDir)
 	if strings.HasSuffix(srcPath, "/") {
 		workingDir = streamDir
 		compressArg = "."
 	}
 
-	tarCmd := exec.Command("tar", "cf", "-", compressArg, "-C", workingDir)
+	tarCmd := exec.Command("tar", "cf", "-", compressArg)
+	tarCmd.Dir = workingDir
 
 	out, err := tarCmd.StdoutPipe()
 	if err != nil {
