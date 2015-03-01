@@ -7,7 +7,7 @@ import (
 	"syscall"
 
 	"github.com/kr/pty"
-	linkpkg "github.com/vito/houdini/iodaemon/link"
+	linkpkg "github.com/vito/garden-systemd/iodaemon/link"
 )
 
 func link(socketPath string) {

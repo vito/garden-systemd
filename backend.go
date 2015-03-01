@@ -1,7 +1,9 @@
-package houdini
+package gardensystemd
 
 import (
+	"bytes"
 	"errors"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -39,7 +41,16 @@ func NewBackend(containersDir string, skeletonDir string) *Backend {
 }
 
 func (backend *Backend) Start() error {
-	return os.MkdirAll(backend.containersDir, 0755)
+	err := os.MkdirAll(backend.containersDir, 0755)
+	if err != nil {
+		return err
+	}
+
+	return run(exec.Command(
+		"systemctl",
+		"link",
+		filepath.Join(backend.skeletonDir, "garden-container@.service"),
+	))
 }
 
 func (backend *Backend) Stop() {
@@ -70,14 +81,66 @@ func (backend *Backend) Create(spec garden.ContainerSpec) (garden.Container, err
 		spec.Handle = id
 	}
 
-	dir := filepath.Join(backend.containersDir, id)
+	dir := filepath.Join(backend.containersDir, "container-"+id)
 
-	err := exec.Command("cp", "-a", backend.skeletonDir, dir).Run()
+	container := newContainer(spec, dir, id)
+
+	err := os.MkdirAll(dir, 0755)
 	if err != nil {
 		return nil, err
 	}
 
-	container := newContainer(spec, dir)
+	runDir := filepath.Join(dir, "run")
+	binDir := filepath.Join(dir, "bin")
+
+	if err := os.MkdirAll(runDir, 0755); err != nil {
+		return nil, err
+	}
+
+	if err := os.MkdirAll(binDir, 0755); err != nil {
+		return nil, err
+	}
+
+	err = run(exec.Command("machinectl", "clone", spec.RootFSPath, id))
+	if err != nil {
+		return nil, err
+	}
+
+	err = run(exec.Command("cp", "-a", filepath.Join(backend.skeletonDir, "bin", "wsh"), filepath.Join(binDir, "wsh")))
+	if err != nil {
+		if err := run(exec.Command("machinectl", "remove", id)); err != nil {
+			log.Println("failed to cleanup image:", err)
+		}
+
+		return nil, err
+	}
+
+	err = run(exec.Command("cp", "-a", filepath.Join(backend.skeletonDir, "bin", "iodaemon"), filepath.Join(binDir, "iodaemon")))
+	if err != nil {
+		if err := run(exec.Command("machinectl", "remove", id)); err != nil {
+			log.Println("failed to cleanup image:", err)
+		}
+
+		return nil, err
+	}
+
+	err = run(exec.Command("cp", "-a", filepath.Join(backend.skeletonDir, "bin", "wshd"), filepath.Join("/var/lib/machines", id, "sbin", "init")))
+	if err != nil {
+		if err := run(exec.Command("machinectl", "remove", id)); err != nil {
+			log.Println("failed to cleanup image:", err)
+		}
+
+		return nil, err
+	}
+
+	err = run(exec.Command("systemctl", "start", "garden-container@"+id))
+	if err != nil {
+		if err := run(exec.Command("machinectl", "remove", id)); err != nil {
+			log.Println("failed to cleanup image:", err)
+		}
+
+		return nil, err
+	}
 
 	backend.containersL.Lock()
 	backend.containers[spec.Handle] = container
@@ -95,7 +158,20 @@ func (backend *Backend) Destroy(handle string) error {
 		return ErrContainerNotFound
 	}
 
-	err := container.Stop(false)
+	err := run(exec.Command("systemctl", "stop", "garden-container@"+container.id))
+	if err != nil {
+		return err
+	}
+
+	for i := 0; i < 10; i++ {
+		err = run(exec.Command("machinectl", "remove", container.id))
+		if err == nil {
+			break
+		}
+
+		time.Sleep(time.Second)
+	}
+
 	if err != nil {
 		return err
 	}
@@ -172,4 +248,18 @@ func containerHasProperties(container *container, properties garden.Properties) 
 	}
 
 	return true
+}
+
+func run(cmd *exec.Cmd) error {
+	outBuf := new(bytes.Buffer)
+	errBuf := new(bytes.Buffer)
+
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		log.Printf("command failed: %v\n\nstdout: %s\n\nstderr: %s\n", cmd.Args, outBuf.String(), errBuf.String())
+		return err
+	}
+
+	return nil
 }

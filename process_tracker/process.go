@@ -6,11 +6,12 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"path/filepath"
 	"sync"
 	"syscall"
 
 	"github.com/cloudfoundry-incubator/garden"
-	"github.com/vito/houdini/iodaemon/link"
+	"github.com/vito/garden-systemd/iodaemon/link"
 )
 
 type Process struct {
@@ -73,7 +74,7 @@ func (p *Process) Spawn(cmd *exec.Cmd, tty *garden.TTYSpec) (ready, active chan 
 	ready = make(chan error, 1)
 	active = make(chan error, 1)
 
-	spawnPath := path.Join(p.containerPath, "bin", "iodaemon")
+	spawnPath := filepath.Join(p.containerPath, "bin", "iodaemon")
 	processSock := path.Join(p.containerPath, "processes", fmt.Sprintf("%d.sock", p.ID()))
 
 	spawnFlags := []string{}

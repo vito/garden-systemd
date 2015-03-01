@@ -9,7 +9,7 @@ import (
 
 	"github.com/cloudfoundry-incubator/garden/server"
 	"github.com/pivotal-golang/lager"
-	"github.com/vito/houdini"
+	"github.com/vito/garden-systemd"
 )
 
 var listenNetwork = flag.String(
@@ -32,18 +32,18 @@ var containerGraceTime = flag.Duration(
 
 var containersDir = flag.String(
 	"depot",
-	"./containers",
+	"/run/garden",
 	"directory in which to store containers",
 )
 
 var skeletonDir = flag.String(
 	"skeleton",
 	"./skeleton",
-	"directory containing container skeleton",
+	"directory containing garden-systemd utility binaries",
 )
 
 func main() {
-	logger := lager.NewLogger("houdini")
+	logger := lager.NewLogger("garden-systemd")
 	logger.RegisterSink(lager.NewWriterSink(os.Stdout, lager.DEBUG))
 
 	depot, err := filepath.Abs(*containersDir)
@@ -56,7 +56,7 @@ func main() {
 		logger.Fatal("failed-to-determine-skeleton-dir", err)
 	}
 
-	backend := houdini.NewBackend(depot, skeleton)
+	backend := gardensystemd.NewBackend(depot, skeleton)
 
 	gardenServer := server.New(*listenNetwork, *listenAddr, *containerGraceTime, backend, logger)
 

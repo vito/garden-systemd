@@ -1,4 +1,4 @@
-package houdini
+package gardensystemd
 
 import (
 	"fmt"
@@ -10,7 +10,7 @@ import (
 	"sync"
 
 	"github.com/cloudfoundry-incubator/garden"
-	"github.com/vito/houdini/process_tracker"
+	"github.com/vito/garden-systemd/process_tracker"
 )
 
 type UndefinedPropertyError struct {
@@ -22,10 +22,11 @@ func (err UndefinedPropertyError) Error() string {
 }
 
 type container struct {
-	handle string
+	id string
 
-	dir     string
-	workDir string
+	dir string
+
+	handle string
 
 	properties  garden.Properties
 	propertiesL sync.RWMutex
@@ -35,12 +36,17 @@ type container struct {
 	processTracker process_tracker.ProcessTracker
 }
 
-func newContainer(spec garden.ContainerSpec, dir string) *container {
-	return &container{
-		handle: spec.Handle,
+func newContainer(spec garden.ContainerSpec, dir string, id string) *container {
+	if spec.Properties == nil {
+		spec.Properties = garden.Properties{}
+	}
 
-		dir:     dir,
-		workDir: filepath.Join(dir, "workdir"),
+	return &container{
+		id: id,
+
+		dir: dir,
+
+		handle: spec.Handle,
 
 		properties: spec.Properties,
 
@@ -55,32 +61,58 @@ func (container *container) Handle() string {
 }
 
 func (container *container) Stop(kill bool) error {
-	return container.processTracker.Stop(kill)
+	var signal string
+	if kill {
+		signal = "SIGKILL"
+	} else {
+		signal = "SIGTERM"
+	}
+
+	return run(exec.Command("machinectl", "kill", "-s", signal, container.id))
 }
 
 func (container *container) Info() (garden.ContainerInfo, error) { return garden.ContainerInfo{}, nil }
 
 func (container *container) StreamIn(dstPath string, tarStream io.Reader) error {
-	finalDestination := filepath.Join(container.workDir, dstPath)
+	streamDir := filepath.Join(container.dir, "stream-in", dstPath)
 
-	err := os.MkdirAll(finalDestination, 0755)
+	err := os.MkdirAll(streamDir, 0755)
 	if err != nil {
 		return err
 	}
 
-	tarCmd := exec.Command("tar", "xf", "-", "-C", finalDestination)
+	tarCmd := exec.Command("tar", "xf", "-", "-C", streamDir)
 	tarCmd.Stdin = tarStream
 
-	return tarCmd.Run()
+	err = run(tarCmd)
+	if err != nil {
+		return err
+	}
+
+	// TODO: can't use copy-to because it doesn't make the dest dir.
+	// use 'bind' even though it permits the container writing to the host...
+	// for now.
+
+	return run(exec.Command("machinectl", "bind", "--mkdir", container.id, streamDir, dstPath))
 }
 
 func (container *container) StreamOut(srcPath string) (io.ReadCloser, error) {
-	absoluteSource := filepath.Join(container.workDir, srcPath)
+	streamDir := filepath.Join(container.dir, "stream-out", srcPath)
 
-	workingDir := filepath.Dir(absoluteSource)
-	compressArg := filepath.Base(absoluteSource)
+	err := os.MkdirAll(streamDir, 0755)
+	if err != nil {
+		return nil, err
+	}
+
+	err = run(exec.Command("machinectl", "copy-from", container.id, srcPath, streamDir))
+	if err != nil {
+		return nil, err
+	}
+
+	workingDir := filepath.Dir(streamDir)
+	compressArg := filepath.Base(streamDir)
 	if strings.HasSuffix(srcPath, "/") {
-		workingDir = absoluteSource
+		workingDir = streamDir
 		compressArg = "."
 	}
 
@@ -132,11 +164,28 @@ func (container *container) NetIn(hostPort, containerPort uint32) (uint32, uint3
 func (container *container) NetOut(garden.NetOutRule) error { return nil }
 
 func (container *container) Run(spec garden.ProcessSpec, processIO garden.ProcessIO) (garden.Process, error) {
-	spec.Path = spec.Path
+	wshPath := filepath.Join(container.dir, "bin", "wsh")
+	sockPath := filepath.Join(container.dir, "run", "wshd.sock")
 
-	cmd := exec.Command(spec.Path, spec.Args...)
-	cmd.Dir = filepath.Join(container.workDir, spec.Dir)
-	cmd.Env = append(os.Environ(), append(container.env, spec.Env...)...)
+	user := "root"
+
+	args := []string{
+		"--socket", sockPath,
+		"--user", user,
+	}
+
+	for _, e := range spec.Env {
+		args = append(args, "--env", e)
+	}
+
+	if spec.Dir != "" {
+		args = append(args, "--dir", spec.Dir)
+	}
+
+	args = append(args, spec.Path)
+	args = append(args, spec.Args...)
+
+	cmd := exec.Command(wshPath, args...)
 
 	return container.processTracker.Run(cmd, processIO, spec.TTY)
 }

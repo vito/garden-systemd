@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/kr/pty"
-	linkpkg "github.com/vito/houdini/iodaemon/link"
-	"github.com/vito/houdini/ptyutil"
+	linkpkg "github.com/vito/garden-systemd/iodaemon/link"
+	"github.com/vito/garden-systemd/ptyutil"
 )
 
 func spawn(socketPath string, argv []string, timeout time.Duration, withTty bool, windowColumns int, windowRows int, debug bool) {
