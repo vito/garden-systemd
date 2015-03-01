@@ -182,7 +182,7 @@ func (backend *Backend) Create(spec garden.ContainerSpec) (garden.Container, err
 		return nil, err
 	}
 
-	err = run(exec.Command("cp", "-a", filepath.Join(backend.skeletonDir, "bin", "wshd"), filepath.Join("/var/lib/machines", id, "sbin", "init")))
+	err = run(exec.Command("cp", "-a", filepath.Join(backend.skeletonDir, "bin", "wshd"), filepath.Join("/var/lib/machines", id, "sbin", "wshd")))
 	if err != nil {
 		if err := run(exec.Command("machinectl", "remove", id)); err != nil {
 			log.Println("failed to cleanup image:", err)
