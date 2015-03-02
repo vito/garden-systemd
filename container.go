@@ -1,16 +1,21 @@
 package gardensystemd
 
 import (
+	"bytes"
+	"encoding/gob"
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net"
 	"os"
 	"os/exec"
 	"path"
 	"strings"
 	"sync"
+	"syscall"
 
 	"github.com/cloudfoundry-incubator/garden"
+	"github.com/vito/garden-systemd/ginit"
 	"github.com/vito/garden-systemd/process_tracker"
 )
 
@@ -182,11 +187,180 @@ func (container *container) NetIn(hostPort, containerPort uint32) (uint32, uint3
 func (container *container) NetOut(garden.NetOutRule) error { return nil }
 
 func (container *container) Run(spec garden.ProcessSpec, processIO garden.ProcessIO) (garden.Process, error) {
-	return container.processTracker.Run(spec, processIO)
+	if spec.User != "" {
+		spec.Env = append(spec.Env, "USER="+spec.User)
+	}
+
+	// set up a basic $PATH
+	if spec.Privileged {
+		spec.Env = append(
+			spec.Env,
+			"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+		)
+	} else {
+		spec.Env = append(
+			spec.Env,
+			"PATH=/usr/local/bin:/usr/bin:/bin",
+		)
+	}
+
+	wshdSock := path.Join(container.dir, "run", "wshd.sock")
+
+	conn, err := net.Dial("unix", wshdSock)
+	if err != nil {
+		println("dial wshd: " + err.Error())
+		return nil, err
+	}
+
+	defer conn.Close()
+
+	enc := gob.NewEncoder(conn)
+
+	runRequest := &ginit.RunRequest{
+		Path: spec.Path,
+		Args: spec.Args,
+		Dir:  spec.Dir,
+		Env:  spec.Env,
+	}
+
+	if spec.TTY != nil {
+		runRequest.TTY = &ginit.TTYSpec{}
+
+		if spec.TTY.WindowSize != nil {
+			runRequest.TTY.Columns = spec.TTY.WindowSize.Columns
+			runRequest.TTY.Rows = spec.TTY.WindowSize.Rows
+		}
+	}
+
+	err = enc.Encode(ginit.Request{
+		Run: runRequest,
+	})
+	if err != nil {
+		println("run request: " + err.Error())
+		return nil, err
+	}
+
+	var b [2048]byte
+	var oob [2048]byte
+
+	n, oobn, _, _, err := conn.(*net.UnixConn).ReadMsgUnix(b[:], oob[:])
+	if err != nil {
+		println("read unix msg: " + err.Error())
+		return nil, err
+	}
+
+	var response ginit.Response
+	err = gob.NewDecoder(bytes.NewBuffer(b[:n])).Decode(&response)
+	if err != nil {
+		println("decode response: " + err.Error())
+		return nil, err
+	}
+
+	if response.Error != nil {
+		err := fmt.Errorf("remote error: %s", *response.Error)
+		println(err.Error())
+		return nil, err
+	}
+
+	scms, err := syscall.ParseSocketControlMessage(oob[:oobn])
+	if err != nil {
+		println("parse socket control msg: " + err.Error())
+		return nil, err
+	}
+
+	if len(scms) < 1 {
+		err := fmt.Errorf("no socket control messages received")
+		println(err.Error())
+		return nil, err
+	}
+
+	scm := scms[0]
+
+	fds, err := syscall.ParseUnixRights(&scm)
+	if err != nil {
+		println("parse unix rights: " + err.Error())
+		return nil, err
+	}
+
+	return attachProcess(
+		response.Run.ProcessID,
+		processIO,
+		response.Run.Rights,
+		fds,
+	), nil
 }
 
 func (container *container) Attach(processID uint32, processIO garden.ProcessIO) (garden.Process, error) {
-	return container.processTracker.Attach(processID, processIO)
+	wshdSock := path.Join(container.dir, "run", "wshd.sock")
+
+	conn, err := net.Dial("unix", wshdSock)
+	if err != nil {
+		println("dial wshd: " + err.Error())
+		return nil, err
+	}
+
+	defer conn.Close()
+
+	enc := gob.NewEncoder(conn)
+
+	err = enc.Encode(ginit.Request{
+		Attach: &ginit.AttachRequest{
+			ProcessID: processID,
+		},
+	})
+	if err != nil {
+		println("attach request: " + err.Error())
+		return nil, err
+	}
+
+	var b [2048]byte
+	var oob [2048]byte
+
+	n, oobn, _, _, err := conn.(*net.UnixConn).ReadMsgUnix(b[:], oob[:])
+	if err != nil {
+		println("read unix msg: " + err.Error())
+		return nil, err
+	}
+
+	var response ginit.Response
+	err = gob.NewDecoder(bytes.NewBuffer(b[:n])).Decode(&response)
+	if err != nil {
+		println("decode response: " + err.Error())
+		return nil, err
+	}
+
+	if response.Error != nil {
+		err := fmt.Errorf("remote error: %s", *response.Error)
+		println(err.Error())
+		return nil, err
+	}
+
+	scms, err := syscall.ParseSocketControlMessage(oob[:oobn])
+	if err != nil {
+		println("parse socket control msg: " + err.Error())
+		return nil, err
+	}
+
+	if len(scms) < 1 {
+		err := fmt.Errorf("no socket control messages received")
+		println(err.Error())
+		return nil, err
+	}
+
+	scm := scms[0]
+
+	fds, err := syscall.ParseUnixRights(&scm)
+	if err != nil {
+		println("parse unix rights: " + err.Error())
+		return nil, err
+	}
+
+	return attachProcess(
+		processID,
+		processIO,
+		response.Attach.Rights,
+		fds,
+	), nil
 }
 
 func (container *container) GetProperty(name string) (string, error) {

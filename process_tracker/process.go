@@ -1,7 +1,6 @@
 package process_tracker
 
 import (
-	"fmt"
 	"os/exec"
 	"path"
 	"path/filepath"
@@ -61,39 +60,6 @@ func (p *Process) Spawn(spec garden.ProcessSpec, processIO garden.ProcessIO) err
 
 	wshArgs := []string{
 		"-socket", wshdSock,
-	}
-
-	if spec.User != "" {
-		spec.Env = append(spec.Env, "USER="+spec.User)
-	}
-
-	// set up a basic $PATH
-	if spec.Privileged {
-		spec.Env = append(
-			spec.Env,
-			"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
-		)
-	} else {
-		spec.Env = append(
-			spec.Env,
-			"PATH=/usr/local/bin:/usr/bin:/bin",
-		)
-	}
-
-	if spec.Dir != "" {
-		wshArgs = append(wshArgs, "--dir", spec.Dir)
-	}
-
-	if spec.TTY != nil {
-		wshArgs = append(wshArgs, "-tty")
-
-		if spec.TTY.WindowSize != nil {
-			wshArgs = append(
-				wshArgs,
-				fmt.Sprintf("-windowColumns=%d", spec.TTY.WindowSize.Columns),
-				fmt.Sprintf("-windowRows=%d", spec.TTY.WindowSize.Rows),
-			)
-		}
 	}
 
 	wshArgs = append(wshArgs, "--", spec.Path)
