@@ -1,28 +1,19 @@
 package process_tracker
 
 import (
-	"bufio"
 	"fmt"
-	"os"
 	"os/exec"
 	"path"
 	"path/filepath"
-	"sync"
 	"syscall"
 
 	"github.com/cloudfoundry-incubator/garden"
-	"github.com/vito/garden-systemd/iodaemon/link"
 )
 
 type Process struct {
 	id uint32
 
 	containerPath string
-
-	runningLink *sync.Once
-
-	linked chan struct{}
-	link   *link.Link
 
 	exited     chan struct{}
 	exitStatus int
@@ -38,10 +29,6 @@ func NewProcess(id uint32, containerPath string) *Process {
 		id: id,
 
 		containerPath: containerPath,
-
-		runningLink: &sync.Once{},
-
-		linked: make(chan struct{}),
 
 		exited: make(chan struct{}),
 
@@ -61,85 +48,86 @@ func (p *Process) Wait() (int, error) {
 }
 
 func (p *Process) SetTTY(tty garden.TTYSpec) error {
-	<-p.linked
-
-	if tty.WindowSize != nil {
-		return p.link.SetWindowSize(tty.WindowSize.Columns, tty.WindowSize.Rows)
-	}
+	//if tty.WindowSize != nil {
+	//return p.link.SetWindowSize(tty.WindowSize.Columns, tty.WindowSize.Rows)
+	//}
 
 	return nil
 }
 
-func (p *Process) Spawn(cmd *exec.Cmd, tty *garden.TTYSpec) (ready, active chan error) {
-	ready = make(chan error, 1)
-	active = make(chan error, 1)
+func (p *Process) Spawn(spec garden.ProcessSpec, processIO garden.ProcessIO) error {
+	wshPath := filepath.Join(p.containerPath, "bin", "wsh")
+	wshdSock := path.Join(p.containerPath, "run", "wshd.sock")
 
-	spawnPath := filepath.Join(p.containerPath, "bin", "iodaemon")
-	processSock := path.Join(p.containerPath, "processes", fmt.Sprintf("%d.sock", p.ID()))
+	wshArgs := []string{
+		"-socket", wshdSock,
+	}
 
-	spawnFlags := []string{}
+	if spec.User != "" {
+		spec.Env = append(spec.Env, "USER="+spec.User)
+	}
 
-	if tty != nil {
-		spawnFlags = append(spawnFlags, "-tty")
+	// set up a basic $PATH
+	if spec.Privileged {
+		spec.Env = append(
+			spec.Env,
+			"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+		)
+	} else {
+		spec.Env = append(
+			spec.Env,
+			"PATH=/usr/local/bin:/usr/bin:/bin",
+		)
+	}
 
-		if tty.WindowSize != nil {
-			spawnFlags = append(
-				spawnFlags,
-				fmt.Sprintf("-windowColumns=%d", tty.WindowSize.Columns),
-				fmt.Sprintf("-windowRows=%d", tty.WindowSize.Rows),
+	if spec.Dir != "" {
+		wshArgs = append(wshArgs, "--dir", spec.Dir)
+	}
+
+	if spec.TTY != nil {
+		wshArgs = append(wshArgs, "-tty")
+
+		if spec.TTY.WindowSize != nil {
+			wshArgs = append(
+				wshArgs,
+				fmt.Sprintf("-windowColumns=%d", spec.TTY.WindowSize.Columns),
+				fmt.Sprintf("-windowRows=%d", spec.TTY.WindowSize.Rows),
 			)
 		}
 	}
 
-	spawnFlags = append(spawnFlags, "spawn", processSock)
+	wshArgs = append(wshArgs, "--", spec.Path)
+	wshArgs = append(wshArgs, spec.Args...)
 
-	spawn := exec.Command(spawnPath, append(spawnFlags, cmd.Args...)...)
-	spawn.Env = cmd.Env
-	spawn.Dir = cmd.Dir
-	spawn.Stderr = os.Stderr
+	spawn := exec.Command(wshPath, wshArgs...)
+
+	spawn.Env = spec.Env
+	spawn.Stdin = processIO.Stdin
+	spawn.Stdout = processIO.Stdout
+	spawn.Stderr = processIO.Stderr
 	spawn.SysProcAttr = &syscall.SysProcAttr{
-		Setpgid: true,
+		Pdeathsig: syscall.SIGKILL,
 	}
 
-	spawnR, err := spawn.StdoutPipe()
+	err := spawn.Start()
 	if err != nil {
-		ready <- err
-		return
-	}
-
-	spawnOut := bufio.NewReader(spawnR)
-
-	err = spawn.Start()
-	if err != nil {
-		ready <- err
-		return
+		return err
 	}
 
 	go func() {
-		defer spawn.Wait()
-
-		_, err := spawnOut.ReadBytes('\n')
+		state, err := spawn.Process.Wait()
 		if err != nil {
-			ready <- fmt.Errorf("failed to read ready: %s", err)
-			return
+			p.completed(-1, err)
+		} else {
+			p.completed(state.Sys().(syscall.WaitStatus).ExitStatus(), nil)
 		}
-
-		ready <- nil
-
-		_, err = spawnOut.ReadBytes('\n')
-		if err != nil {
-			active <- fmt.Errorf("failed to read active: %s", err)
-			return
-		}
-
-		active <- nil
 	}()
 
-	return
+	return nil
 }
 
 func (p *Process) Link() {
-	p.runningLink.Do(p.runLinker)
+	//p.runningLink.Do(p.runLinker)
 }
 
 func (p *Process) Attach(processIO garden.ProcessIO) {
@@ -157,32 +145,13 @@ func (p *Process) Attach(processIO garden.ProcessIO) {
 }
 
 func (p *Process) Signal(signal garden.Signal) error {
-	select {
-	case <-p.linked:
-		return p.link.SendSignal(signal)
-	default:
-		return nil
-	}
-}
-
-func (p *Process) runLinker() {
-	processSock := path.Join(p.containerPath, "processes", fmt.Sprintf("%d.sock", p.ID()))
-
-	link, err := link.Create(processSock, p.stdout, p.stderr)
-	if err != nil {
-		p.completed(-1, err)
-		return
-	}
-
-	p.stdin.AddSink(link)
-
-	p.link = link
-	close(p.linked)
-
-	p.completed(p.link.Wait())
-
-	// don't leak stdin pipe
-	p.stdin.Close()
+	//select {
+	//case <-p.linked:
+	//return p.link.SendSignal(signal)
+	//default:
+	//return nil
+	//}
+	return nil
 }
 
 func (p *Process) completed(exitStatus int, err error) {

@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/exec"
 	"path"
-	"path/filepath"
 	"strings"
 	"sync"
 
@@ -183,30 +182,7 @@ func (container *container) NetIn(hostPort, containerPort uint32) (uint32, uint3
 func (container *container) NetOut(garden.NetOutRule) error { return nil }
 
 func (container *container) Run(spec garden.ProcessSpec, processIO garden.ProcessIO) (garden.Process, error) {
-	wshPath := filepath.Join(container.dir, "bin", "wsh")
-	sockPath := filepath.Join(container.dir, "run", "wshd.sock")
-
-	user := "root"
-
-	args := []string{
-		"--socket", sockPath,
-		"--user", user,
-	}
-
-	for _, e := range spec.Env {
-		args = append(args, "--env", e)
-	}
-
-	if spec.Dir != "" {
-		args = append(args, "--dir", spec.Dir)
-	}
-
-	args = append(args, spec.Path)
-	args = append(args, spec.Args...)
-
-	cmd := exec.Command(wshPath, args...)
-
-	return container.processTracker.Run(cmd, processIO, spec.TTY)
+	return container.processTracker.Run(spec, processIO)
 }
 
 func (container *container) Attach(processID uint32, processIO garden.ProcessIO) (garden.Process, error) {

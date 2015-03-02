@@ -2,14 +2,13 @@ package process_tracker
 
 import (
 	"fmt"
-	"os/exec"
 	"sync"
 
 	"github.com/cloudfoundry-incubator/garden"
 )
 
 type ProcessTracker interface {
-	Run(*exec.Cmd, garden.ProcessIO, *garden.TTYSpec) (garden.Process, error)
+	Run(garden.ProcessSpec, garden.ProcessIO) (garden.Process, error)
 	Attach(uint32, garden.ProcessIO) (garden.Process, error)
 	Restore(processID uint32)
 	ActiveProcesses() []garden.Process
@@ -42,7 +41,7 @@ func New(containerPath string) ProcessTracker {
 	}
 }
 
-func (t *processTracker) Run(cmd *exec.Cmd, processIO garden.ProcessIO, tty *garden.TTYSpec) (garden.Process, error) {
+func (t *processTracker) Run(spec garden.ProcessSpec, io garden.ProcessIO) (garden.Process, error) {
 	t.processesMutex.Lock()
 
 	processID := t.nextProcessID
@@ -54,18 +53,7 @@ func (t *processTracker) Run(cmd *exec.Cmd, processIO garden.ProcessIO, tty *gar
 
 	t.processesMutex.Unlock()
 
-	ready, active := process.Spawn(cmd, tty)
-
-	err := <-ready
-	if err != nil {
-		return nil, err
-	}
-
-	process.Attach(processIO)
-
-	go t.link(processID)
-
-	err = <-active
+	err := process.Spawn(spec, io)
 	if err != nil {
 		return nil, err
 	}

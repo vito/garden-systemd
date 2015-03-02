@@ -1,6 +1,0 @@
-msg.o: msg.c msg.h
-pump.o: pump.c pump.h util.h
-un.o: un.c un.h util.h
-util.o: util.c util.h
-wsh.o: wsh.c msg.h pump.h un.h
-wshd.o: wshd.c msg.h un.h util.h
