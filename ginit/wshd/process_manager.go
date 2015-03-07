@@ -5,6 +5,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"strings"
 	"sync"
 	"syscall"
 
@@ -29,15 +30,22 @@ type ProcessManager struct {
 }
 
 func (mgr *ProcessManager) Run(conn net.Conn, req *ginit.RunRequest) {
-	bin, err := exec.LookPath(req.Path)
-	if err != nil {
-		println("path lookup: " + err.Error())
-		respondErr(conn, err)
-		return
+	var execPath string
+	if strings.Contains(req.Path, "/") {
+		execPath = req.Path
+	} else {
+		bin, err := exec.LookPath(req.Path)
+		if err != nil {
+			println("path lookup: " + err.Error())
+			respondErr(conn, err)
+			return
+		}
+
+		execPath = bin
 	}
 
 	cmd := &exec.Cmd{
-		Path: bin,
+		Path: execPath,
 		Args: append([]string{req.Path}, req.Args...),
 		Dir:  req.Dir,
 		Env:  req.Env,
