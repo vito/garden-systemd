@@ -327,8 +327,8 @@ func run(cmd *exec.Cmd) error {
 	outBuf := new(bytes.Buffer)
 	errBuf := new(bytes.Buffer)
 
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	cmd.Stdout = outBuf
+	cmd.Stderr = errBuf
 	if err := cmd.Run(); err != nil {
 		log.Printf("command failed: %v\n\nstdout: %s\n\nstderr: %s\n", cmd.Args, outBuf.String(), errBuf.String())
 		return err
