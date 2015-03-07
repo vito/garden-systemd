@@ -43,6 +43,8 @@ var skeletonDir = flag.String(
 )
 
 func main() {
+	flag.Parse()
+
 	logger := lager.NewLogger("garden-systemd")
 	logger.RegisterSink(lager.NewWriterSink(os.Stdout, lager.DEBUG))
 
