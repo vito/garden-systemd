@@ -363,6 +363,18 @@ func (container *container) Attach(processID uint32, processIO garden.ProcessIO)
 	), nil
 }
 
+func (container *container) GetProperties() (garden.Properties, error) {
+	props := garden.Properties{}
+
+	container.propertiesL.RLock()
+	for n, v := range container.properties {
+		props[n] = v
+	}
+	container.propertiesL.RUnlock()
+
+	return props, nil
+}
+
 func (container *container) GetProperty(name string) (string, error) {
 	container.propertiesL.RLock()
 	property, found := container.properties[name]
