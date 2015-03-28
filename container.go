@@ -409,6 +409,10 @@ func (container *container) RemoveProperty(name string) error {
 	return nil
 }
 
+func (container *container) Metrics() (garden.Metrics, error) {
+	return garden.Metrics{}, nil
+}
+
 func (container *container) currentProperties() garden.Properties {
 	properties := garden.Properties{}
 
