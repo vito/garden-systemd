@@ -32,7 +32,7 @@ var containerGraceTime = flag.Duration(
 
 var containersDir = flag.String(
 	"depot",
-	"/run/garden",
+	"/var/lib/garden",
 	"directory in which to store containers",
 )
 
