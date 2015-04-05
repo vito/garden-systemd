@@ -215,7 +215,7 @@ func (mgr *ProcessManager) CreateDir(conn net.Conn, req *ginit.CreateDirRequest)
 		ginit.Response{
 			CreateDir: &ginit.CreateDirResponse{},
 		},
-		rights.UnixRights(),
+		nil,
 	)
 	if err != nil {
 		println("failed to encode response: " + err.Error())
