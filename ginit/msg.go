@@ -8,16 +8,18 @@ import (
 )
 
 type Request struct {
-	Run    *RunRequest
-	Attach *AttachRequest
-	Signal *SignalRequest
+	Run       *RunRequest
+	Attach    *AttachRequest
+	Signal    *SignalRequest
+	CreateDir *CreateDirRequest
 }
 
 type Response struct {
-	Run    *RunResponse
-	Attach *AttachResponse
-	Signal *SignalResponse
-	Error  *string
+	Run       *RunResponse
+	Attach    *AttachResponse
+	Signal    *SignalResponse
+	CreateDir *CreateDirResponse
+	Error     *string
 }
 
 type RunRequest struct {
@@ -149,3 +151,9 @@ type SignalRequest struct {
 }
 
 type SignalResponse struct{}
+
+type CreateDirRequest struct {
+	Path string
+}
+
+type CreateDirResponse struct{}

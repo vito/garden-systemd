@@ -93,11 +93,42 @@ func (container *container) StreamIn(dstPath string, tarStream io.Reader) error 
 		return err
 	}
 
-	// TODO: can't use copy-to because it doesn't make the dest dir.
-	// use 'bind' even though it permits the container writing to the host...
-	// for now.
+	wshdSock := path.Join(container.dir, "run", "wshd.sock")
 
-	return run(exec.Command("machinectl", "bind", "--mkdir", container.id, streamDir, dstPath))
+	conn, err := net.Dial("unix", wshdSock)
+	if err != nil {
+		println("dial wshd: " + err.Error())
+		return err
+	}
+
+	defer conn.Close()
+
+	enc := gob.NewEncoder(conn)
+
+	err = enc.Encode(ginit.Request{
+		CreateDir: &ginit.CreateDirRequest{
+			Path: dstPath,
+		},
+	})
+	if err != nil {
+		println("run request: " + err.Error())
+		return err
+	}
+
+	var response ginit.Response
+	err = gob.NewDecoder(conn).Decode(&response)
+	if err != nil {
+		println("decode response: " + err.Error())
+		return err
+	}
+
+	if response.Error != nil {
+		err := fmt.Errorf("remote error: %s", *response.Error)
+		println(err.Error())
+		return err
+	}
+
+	return run(exec.Command("machinectl", "copy-to", container.id, streamDir, dstPath))
 }
 
 func (container *container) StreamOut(srcPath string) (io.ReadCloser, error) {

@@ -83,6 +83,10 @@ func handleConnection(mgr *ProcessManager, conn net.Conn) {
 		if request.Attach != nil {
 			mgr.Attach(conn, request.Attach)
 		}
+
+		if request.CreateDir != nil {
+			mgr.CreateDir(conn, request.CreateDir)
+		}
 	}
 }
 

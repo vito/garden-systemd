@@ -202,3 +202,23 @@ func (mgr *ProcessManager) Attach(conn net.Conn, req *ginit.AttachRequest) {
 		return
 	}
 }
+
+func (mgr *ProcessManager) CreateDir(conn net.Conn, req *ginit.CreateDirRequest) {
+	err := os.MkdirAll(req.Path, 0755)
+	if err != nil {
+		respondErr(conn, err)
+		return
+	}
+
+	err = respondUnix(
+		conn,
+		ginit.Response{
+			CreateDir: &ginit.CreateDirResponse{},
+		},
+		rights.UnixRights(),
+	)
+	if err != nil {
+		println("failed to encode response: " + err.Error())
+		return
+	}
+}
