@@ -85,6 +85,8 @@ func (container *container) StreamIn(dstPath string, tarStream io.Reader) error 
 		return err
 	}
 
+	defer os.RemoveAll(streamDir)
+
 	tarCmd := exec.Command("tar", "xf", "-", "-C", streamDir)
 	tarCmd.Stdin = tarStream
 
@@ -170,15 +172,19 @@ func (container *container) StreamOut(srcPath string) (io.ReadCloser, error) {
 	return waitCloser{
 		ReadCloser: out,
 		proc:       tarCmd,
+		tmpdir:     streamDirBase,
 	}, nil
 }
 
 type waitCloser struct {
 	io.ReadCloser
-	proc *exec.Cmd
+	proc   *exec.Cmd
+	tmpdir string
 }
 
 func (c waitCloser) Close() error {
+	defer os.RemoveAll(c.tmpdir)
+
 	err := c.Close()
 	if err != nil {
 		return err
