@@ -134,6 +134,10 @@ func (container *container) StreamIn(dstPath string, tarStream io.Reader) error 
 }
 
 func (container *container) StreamOut(srcPath string) (io.ReadCloser, error) {
+	if strings.HasSuffix(srcPath, "/") {
+		srcPath += "."
+	}
+
 	streamDirBase, err := ioutil.TempDir(container.dir, "stream-out")
 	if err != nil {
 		return nil, err
@@ -149,10 +153,6 @@ func (container *container) StreamOut(srcPath string) (io.ReadCloser, error) {
 
 	workingDir := path.Dir(streamDir)
 	compressArg := path.Base(streamDir)
-	if strings.HasSuffix(srcPath, "/") {
-		workingDir = streamDir
-		compressArg = "."
-	}
 
 	tarCmd := exec.Command("tar", "cf", "-", compressArg)
 	tarCmd.Dir = workingDir
