@@ -2,3 +2,4 @@
 /init/wsh
 /init/wshd
 /init/*.o
+/dist/*

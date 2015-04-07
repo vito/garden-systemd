@@ -1,3 +1,16 @@
+all: skeleton
+
+install: skeleton dist/garden-systemd
+	rsync dist/garden-systemd /usr/sbin/garden-systemd
+	mkdir -p /var/lib/garden-systemd
+	rsync -a skeleton/ /var/lib/garden-systemd/skeleton/
+
+dist/garden-systemd: dist
+	go build -o dist/garden-systemd ./cmd/garden-systemd
+
+dist:
+	mkdir dist
+
 skeleton: skeleton/bin/wshd
 
 skeleton/bin/wshd: skeleton/bin ginit/* ginit/wshd/*

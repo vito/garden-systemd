@@ -1,0 +1,5 @@
+[Unit]
+Description=Garden Systemd Backend
+
+[Service]
+ExecStart=/usr/bin/garden-systemd --skeleton /var/lib/garden-systemd/skeleton
