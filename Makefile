@@ -5,7 +5,7 @@ install: skeleton dist/garden-systemd
 	mkdir -p /var/lib/garden-systemd
 	rsync -a skeleton/ /var/lib/garden-systemd/skeleton/
 
-dist/garden-systemd: dist
+dist/garden-systemd: dist * cmd/garden-systemd/*
 	go build -o dist/garden-systemd ./cmd/garden-systemd
 
 dist:

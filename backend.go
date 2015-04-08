@@ -49,6 +49,13 @@ func (backend *Backend) Start() error {
 		return err
 	}
 
+	// TODO: nothing seems to create this on arch;
+	// needed by machinectl clone
+	err = os.MkdirAll("/run/systemd/nspawn/locks", 0755)
+	if err != nil {
+		return err
+	}
+
 	return run(exec.Command(
 		"systemctl",
 		"link",
