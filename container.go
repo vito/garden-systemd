@@ -16,7 +16,6 @@ import (
 
 	"github.com/cloudfoundry-incubator/garden"
 	"github.com/vito/garden-systemd/ginit"
-	"github.com/vito/garden-systemd/process_tracker"
 )
 
 type UndefinedPropertyError struct {
@@ -38,8 +37,6 @@ type container struct {
 	propertiesL sync.RWMutex
 
 	env []string
-
-	processTracker process_tracker.ProcessTracker
 }
 
 func newContainer(spec garden.ContainerSpec, dir string, id string) *container {
@@ -57,8 +54,6 @@ func newContainer(spec garden.ContainerSpec, dir string, id string) *container {
 		properties: spec.Properties,
 
 		env: spec.Env,
-
-		processTracker: process_tracker.New(dir),
 	}
 }
 
