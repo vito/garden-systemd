@@ -297,6 +297,35 @@ func (mgr *ProcessManager) SetWindowSize(conn net.Conn, req *ginit.SetWindowSize
 	}
 }
 
+func (mgr *ProcessManager) Signal(conn net.Conn, req *ginit.SignalRequest) {
+	mgr.processesL.Lock()
+	process, found := mgr.processes[req.ProcessID]
+	mgr.processesL.Unlock()
+
+	if !found {
+		respondErr(conn, fmt.Errorf("unknown process: %d", req.ProcessID))
+		return
+	}
+
+	err := process.Signal(req.Signal)
+	if err != nil {
+		respondErr(conn, err)
+		return
+	}
+
+	err = respondUnix(
+		conn,
+		ginit.Response{
+			Signal: &ginit.SignalResponse{},
+		},
+		nil,
+	)
+	if err != nil {
+		println("failed to encode response: " + err.Error())
+		return
+	}
+}
+
 func lookupUser(name string) (*user.User, error) {
 	file, err := ioutil.ReadFile("/etc/passwd")
 	if err != nil {

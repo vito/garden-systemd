@@ -45,6 +45,10 @@ func (p *Process) SetWindowSize(columns, rows int) error {
 	return ptyutil.SetWinSize(p.StdinW, columns, rows)
 }
 
+func (p *Process) Signal(signal os.Signal) error {
+	return p.Process.Signal(signal)
+}
+
 func fdRef(file *os.File) *int {
 	if file == nil {
 		return nil

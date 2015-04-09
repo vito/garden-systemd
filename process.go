@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"sync"
+	"syscall"
 
 	"github.com/cloudfoundry-incubator/garden"
 	"github.com/vito/garden-systemd/ginit"
@@ -149,5 +150,47 @@ func (p *initProcess) SetTTY(spec garden.TTYSpec) error {
 }
 
 func (p *initProcess) Signal(sig garden.Signal) error {
-	return fmt.Errorf("Signal not implemented")
+	var signal os.Signal
+	switch sig {
+	case garden.SignalTerminate:
+		signal = syscall.SIGTERM
+	default:
+		signal = syscall.SIGKILL
+	}
+
+	conn, err := net.Dial("unix", p.wshdSock)
+	if err != nil {
+		println("dial wshd: " + err.Error())
+		return err
+	}
+
+	defer conn.Close()
+
+	enc := gob.NewEncoder(conn)
+
+	err = enc.Encode(ginit.Request{
+		Signal: &ginit.SignalRequest{
+			ProcessID: p.processID,
+			Signal:    signal,
+		},
+	})
+	if err != nil {
+		println("run request: " + err.Error())
+		return err
+	}
+
+	var response ginit.Response
+	err = gob.NewDecoder(conn).Decode(&response)
+	if err != nil {
+		println("decode response: " + err.Error())
+		return err
+	}
+
+	if response.Error != nil {
+		err := fmt.Errorf("remote error: %s", *response.Error)
+		println(err.Error())
+		return err
+	}
+
+	return nil
 }
