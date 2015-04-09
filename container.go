@@ -266,6 +266,9 @@ func (container *container) Run(spec garden.ProcessSpec, processIO garden.Proces
 		if spec.TTY.WindowSize != nil {
 			runRequest.TTY.Columns = spec.TTY.WindowSize.Columns
 			runRequest.TTY.Rows = spec.TTY.WindowSize.Rows
+		} else {
+			runRequest.TTY.Columns = 80
+			runRequest.TTY.Rows = 24
 		}
 	}
 
