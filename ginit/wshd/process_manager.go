@@ -74,7 +74,7 @@ func (mgr *ProcessManager) Run(conn net.Conn, req *ginit.RunRequest) {
 		Path: execPath,
 		Args: append([]string{req.Path}, req.Args...),
 		Dir:  req.Dir,
-		Env:  req.Env,
+		Env:  env,
 	}
 
 	statusR, statusW, err := os.Pipe()
