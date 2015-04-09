@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/gob"
 	"flag"
+	"io"
 	"net"
 	"os"
 	"os/exec"
@@ -94,27 +95,35 @@ func handleConnection(mgr *ProcessManager, conn net.Conn) {
 		var request ginit.Request
 		err := dec.Decode(&request)
 		if err != nil {
-			println("decode: " + err.Error())
+			if err != io.EOF {
+				println("decode: " + err.Error())
+			}
+
 			return
 		}
 
 		if request.Run != nil {
+			println("handling run")
 			mgr.Run(conn, request.Run)
 		}
 
 		if request.Attach != nil {
+			println("handling attach")
 			mgr.Attach(conn, request.Attach)
 		}
 
 		if request.CreateDir != nil {
+			println("handling create dir")
 			mgr.CreateDir(conn, request.CreateDir)
 		}
 
 		if request.SetWindowSize != nil {
+			println("handling set window size")
 			mgr.SetWindowSize(conn, request.SetWindowSize)
 		}
 
 		if request.Signal != nil {
+			println("handling signal")
 			mgr.Signal(conn, request.Signal)
 		}
 	}

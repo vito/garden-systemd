@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"strconv"
 	"sync"
 	"syscall"
 
@@ -43,10 +44,14 @@ func (p *Process) CloseStdin() error {
 }
 
 func (p *Process) SetWindowSize(columns, rows int) error {
+	println("updating pty size to: " + strconv.Itoa(columns) + "x" + strconv.Itoa(rows))
+
 	err := ptyutil.SetWinSize(p.StdinW, columns, rows)
 	if err != nil {
 		return err
 	}
+
+	println("sending SIGWINCH to " + strconv.Itoa(p.Process.Pid))
 
 	return p.Process.Signal(syscall.SIGWINCH)
 }
