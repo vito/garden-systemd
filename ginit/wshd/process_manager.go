@@ -70,11 +70,30 @@ func (mgr *ProcessManager) Run(conn net.Conn, req *ginit.RunRequest) {
 	env = append(env, "USER="+req.User)
 	env = append(env, "HOME="+userInfo.HomeDir)
 
+	var uid, gid uint32
+	_, err = fmt.Sscanf(userInfo.Uid, "%d", &uid)
+	if err != nil {
+		println("uid parse: " + err.Error())
+		respondErr(conn, err)
+	}
+
+	_, err = fmt.Sscanf(userInfo.Gid, "%d", &gid)
+	if err != nil {
+		println("gid parse: " + err.Error())
+		respondErr(conn, err)
+	}
+
 	cmd := &exec.Cmd{
 		Path: execPath,
 		Args: append([]string{req.Path}, req.Args...),
 		Dir:  req.Dir,
 		Env:  env,
+		SysProcAttr: &syscall.SysProcAttr{
+			Credential: &syscall.Credential{
+				Uid: uid,
+				Gid: gid,
+			},
+		},
 	}
 
 	statusR, statusW, err := os.Pipe()
