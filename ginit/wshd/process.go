@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"sync"
+	"syscall"
 
 	"github.com/vito/garden-systemd/ginit"
 	"github.com/vito/garden-systemd/ptyutil"
@@ -42,7 +43,12 @@ func (p *Process) CloseStdin() error {
 }
 
 func (p *Process) SetWindowSize(columns, rows int) error {
-	return ptyutil.SetWinSize(p.StdinW, columns, rows)
+	err := ptyutil.SetWinSize(p.StdinW, columns, rows)
+	if err != nil {
+		return err
+	}
+
+	return p.Process.Signal(syscall.SIGWINCH)
 }
 
 func (p *Process) Signal(signal os.Signal) error {
