@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/vito/garden-systemd/ginit"
+	"github.com/vito/houdini/ptyutil"
 )
 
 type Process struct {
@@ -38,6 +39,10 @@ func (p *Process) CloseStdin() error {
 	p.StdinW = nil
 
 	return nil
+}
+
+func (p *Process) SetWindowSize(columns, rows int) error {
+	return ptyutil.SetWinSize(p.StdinW, columns, rows)
 }
 
 func fdRef(file *os.File) *int {

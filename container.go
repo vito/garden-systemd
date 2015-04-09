@@ -315,6 +315,7 @@ func (container *container) Run(spec garden.ProcessSpec, processIO garden.Proces
 		processIO,
 		response.Run.Rights,
 		fds,
+		wshdSock,
 	), nil
 }
 
@@ -388,6 +389,7 @@ func (container *container) Attach(processID uint32, processIO garden.ProcessIO)
 		processIO,
 		response.Attach.Rights,
 		fds,
+		wshdSock,
 	), nil
 }
 

@@ -1,8 +1,10 @@
 package gardensystemd
 
 import (
+	"encoding/gob"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"sync"
 
@@ -15,6 +17,8 @@ type initProcess struct {
 
 	copying *sync.WaitGroup
 	statusR *os.File
+
+	wshdSock string
 }
 
 func attachProcess(
@@ -22,6 +26,7 @@ func attachProcess(
 	processIO garden.ProcessIO,
 	rights ginit.FDRights,
 	fds []int,
+	wshdSock string,
 ) *initProcess {
 	offsets := rights.Offsets()
 
@@ -77,6 +82,8 @@ func attachProcess(
 
 		copying: copying,
 		statusR: status,
+
+		wshdSock: wshdSock,
 	}
 }
 
@@ -97,7 +104,48 @@ func (p *initProcess) Wait() (int, error) {
 }
 
 func (p *initProcess) SetTTY(spec garden.TTYSpec) error {
-	return fmt.Errorf("SetTTY not implemented")
+	conn, err := net.Dial("unix", p.wshdSock)
+	if err != nil {
+		println("dial wshd: " + err.Error())
+		return err
+	}
+
+	defer conn.Close()
+
+	enc := gob.NewEncoder(conn)
+
+	var columns, rows int
+	if spec.WindowSize != nil {
+		columns = spec.WindowSize.Columns
+		rows = spec.WindowSize.Rows
+	}
+
+	err = enc.Encode(ginit.Request{
+		SetWindowSize: &ginit.SetWindowSizeRequest{
+			ProcessID: p.processID,
+			Columns:   columns,
+			Rows:      rows,
+		},
+	})
+	if err != nil {
+		println("run request: " + err.Error())
+		return err
+	}
+
+	var response ginit.Response
+	err = gob.NewDecoder(conn).Decode(&response)
+	if err != nil {
+		println("decode response: " + err.Error())
+		return err
+	}
+
+	if response.Error != nil {
+		err := fmt.Errorf("remote error: %s", *response.Error)
+		println(err.Error())
+		return err
+	}
+
+	return nil
 }
 
 func (p *initProcess) Signal(sig garden.Signal) error {

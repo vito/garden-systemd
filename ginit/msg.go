@@ -8,18 +8,20 @@ import (
 )
 
 type Request struct {
-	Run       *RunRequest
-	Attach    *AttachRequest
-	Signal    *SignalRequest
-	CreateDir *CreateDirRequest
+	Run           *RunRequest
+	Attach        *AttachRequest
+	Signal        *SignalRequest
+	CreateDir     *CreateDirRequest
+	SetWindowSize *SetWindowSizeRequest
 }
 
 type Response struct {
-	Run       *RunResponse
-	Attach    *AttachResponse
-	Signal    *SignalResponse
-	CreateDir *CreateDirResponse
-	Error     *string
+	Run           *RunResponse
+	Attach        *AttachResponse
+	Signal        *SignalResponse
+	CreateDir     *CreateDirResponse
+	SetWindowSize *SetWindowSizeResponse
+	Error         *string
 }
 
 type RunRequest struct {
@@ -152,6 +154,14 @@ type SignalRequest struct {
 }
 
 type SignalResponse struct{}
+
+type SetWindowSizeRequest struct {
+	ProcessID uint32
+	Columns   int
+	Rows      int
+}
+
+type SetWindowSizeResponse struct{}
 
 type CreateDirRequest struct {
 	Path string

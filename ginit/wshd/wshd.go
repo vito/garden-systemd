@@ -109,6 +109,10 @@ func handleConnection(mgr *ProcessManager, conn net.Conn) {
 		if request.CreateDir != nil {
 			mgr.CreateDir(conn, request.CreateDir)
 		}
+
+		if request.SetWindowSize != nil {
+			mgr.SetWindowSize(conn, request.SetWindowSize)
+		}
 	}
 }
 
