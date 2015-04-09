@@ -13,6 +13,7 @@ type Request struct {
 	Signal        *SignalRequest
 	CreateDir     *CreateDirRequest
 	SetWindowSize *SetWindowSizeRequest
+	CloseStdin    *CloseStdinRequest
 }
 
 type Response struct {
@@ -21,6 +22,7 @@ type Response struct {
 	Signal        *SignalResponse
 	CreateDir     *CreateDirResponse
 	SetWindowSize *SetWindowSizeResponse
+	CloseStdin    *CloseStdinResponse
 	Error         *string
 }
 
@@ -168,3 +170,9 @@ type CreateDirRequest struct {
 }
 
 type CreateDirResponse struct{}
+
+type CloseStdinRequest struct {
+	ProcessID uint32
+}
+
+type CloseStdinResponse struct{}

@@ -215,10 +215,6 @@ func (mgr *ProcessManager) Run(conn net.Conn, req *ginit.RunRequest) {
 		println("failed to encode response: " + err.Error())
 		return
 	}
-
-	// TODO: closing stdin should be an explicit message that results in
-	// this.
-	process.CloseStdin()
 }
 
 func (mgr *ProcessManager) Attach(conn net.Conn, req *ginit.AttachRequest) {
@@ -317,6 +313,35 @@ func (mgr *ProcessManager) Signal(conn net.Conn, req *ginit.SignalRequest) {
 		conn,
 		ginit.Response{
 			Signal: &ginit.SignalResponse{},
+		},
+		nil,
+	)
+	if err != nil {
+		println("failed to encode response: " + err.Error())
+		return
+	}
+}
+
+func (mgr *ProcessManager) CloseStdin(conn net.Conn, req *ginit.CloseStdinRequest) {
+	mgr.processesL.Lock()
+	process, found := mgr.processes[req.ProcessID]
+	mgr.processesL.Unlock()
+
+	if !found {
+		respondErr(conn, fmt.Errorf("unknown process: %d", req.ProcessID))
+		return
+	}
+
+	err := process.CloseStdin()
+	if err != nil {
+		respondErr(conn, err)
+		return
+	}
+
+	err = respondUnix(
+		conn,
+		ginit.Response{
+			CloseStdin: &ginit.CloseStdinResponse{},
 		},
 		nil,
 	)

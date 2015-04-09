@@ -51,11 +51,24 @@ func attachProcess(
 
 	copying := new(sync.WaitGroup)
 
+	process := &initProcess{
+		processID: processID,
+
+		copying: copying,
+		statusR: status,
+
+		wshdSock: wshdSock,
+	}
+
 	if stdin != nil {
 		// does not count towards copying; there may never be anything on
 		// processIO.Stdin, which would block forever.
 		go func() {
-			io.Copy(stdin, processIO.Stdin)
+			_, err := io.Copy(stdin, processIO.Stdin)
+			if err == nil {
+				process.closeStdin()
+			}
+
 			stdin.Close()
 		}()
 	}
@@ -78,14 +91,7 @@ func attachProcess(
 		}()
 	}
 
-	return &initProcess{
-		processID: processID,
-
-		copying: copying,
-		statusR: status,
-
-		wshdSock: wshdSock,
-	}
+	return process
 }
 
 func (p *initProcess) ID() uint32 {
@@ -172,6 +178,43 @@ func (p *initProcess) Signal(sig garden.Signal) error {
 		Signal: &ginit.SignalRequest{
 			ProcessID: p.processID,
 			Signal:    signal,
+		},
+	})
+	if err != nil {
+		println("run request: " + err.Error())
+		return err
+	}
+
+	var response ginit.Response
+	err = gob.NewDecoder(conn).Decode(&response)
+	if err != nil {
+		println("decode response: " + err.Error())
+		return err
+	}
+
+	if response.Error != nil {
+		err := fmt.Errorf("remote error: %s", *response.Error)
+		println(err.Error())
+		return err
+	}
+
+	return nil
+}
+
+func (p *initProcess) closeStdin() error {
+	conn, err := net.Dial("unix", p.wshdSock)
+	if err != nil {
+		println("dial wshd: " + err.Error())
+		return err
+	}
+
+	defer conn.Close()
+
+	enc := gob.NewEncoder(conn)
+
+	err = enc.Encode(ginit.Request{
+		CloseStdin: &ginit.CloseStdinRequest{
+			ProcessID: p.processID,
 		},
 	})
 	if err != nil {

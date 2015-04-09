@@ -126,6 +126,11 @@ func handleConnection(mgr *ProcessManager, conn net.Conn) {
 			println("handling signal")
 			mgr.Signal(conn, request.Signal)
 		}
+
+		if request.CloseStdin != nil {
+			println("handling close stdin")
+			mgr.CloseStdin(conn, request.CloseStdin)
+		}
 	}
 }
 
