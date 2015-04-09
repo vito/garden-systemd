@@ -49,13 +49,6 @@ func (backend *Backend) Start() error {
 		return err
 	}
 
-	// TODO: nothing seems to create this on arch;
-	// needed by machinectl clone
-	err = os.MkdirAll("/run/systemd/nspawn/locks", 0755)
-	if err != nil {
-		return err
-	}
-
 	return run(exec.Command(
 		"systemctl",
 		"link",
@@ -101,19 +94,6 @@ func (backend *Backend) Create(spec garden.ContainerSpec) (garden.Container, err
 	case "docker":
 		image = filepath.Base(rootfs.Path)
 
-		err := run(exec.Command(
-			"machinectl",
-			"image-status",
-			image,
-		))
-		if err == nil {
-			// image already fetched
-
-			// ideally --force would be atomic, so we can always fetch and make
-			// sure the patch is warm
-			break
-		}
-
 		dockerIndex := "https://index.docker.io"
 		if rootfs.Host != "" {
 			dockerIndex = "https://" + rootfs.Host
@@ -141,9 +121,10 @@ func (backend *Backend) Create(spec garden.ContainerSpec) (garden.Container, err
 		err = run(exec.Command(
 			"machinectl",
 			"pull-dkr",
-			repo+":"+tag,
 			"--verify", "no",
 			"--dkr-index-url", dockerIndex,
+			repo+":"+tag,
+			id,
 		))
 		if err != nil {
 			return nil, err
@@ -169,11 +150,6 @@ func (backend *Backend) Create(spec garden.ContainerSpec) (garden.Container, err
 	}
 
 	if err := os.MkdirAll(binDir, 0755); err != nil {
-		return nil, err
-	}
-
-	err = run(exec.Command("machinectl", "clone", image, id))
-	if err != nil {
 		return nil, err
 	}
 
