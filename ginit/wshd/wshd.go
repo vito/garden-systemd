@@ -113,6 +113,10 @@ func handleConnection(mgr *ProcessManager, conn net.Conn) {
 		if request.SetWindowSize != nil {
 			mgr.SetWindowSize(conn, request.SetWindowSize)
 		}
+
+		if request.Signal != nil {
+			mgr.Signal(conn, request.Signal)
+		}
 	}
 }
 
