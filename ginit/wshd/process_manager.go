@@ -5,6 +5,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"os/user"
 	"strings"
 	"sync"
 	"syscall"
@@ -43,6 +44,30 @@ func (mgr *ProcessManager) Run(conn net.Conn, req *ginit.RunRequest) {
 
 		execPath = bin
 	}
+
+	userInfo, err := user.Lookup(req.User)
+	if err != nil {
+		println("user lookup: " + err.Error())
+		respondErr(conn, err)
+	}
+
+	env := req.Env
+
+	// set up a basic $PATH
+	if req.User == "root" {
+		env = append(
+			env,
+			"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+		)
+	} else {
+		env = append(
+			env,
+			"PATH=/usr/local/bin:/usr/bin:/bin",
+		)
+	}
+
+	env = append(env, "USER="+req.User)
+	env = append(env, "HOME="+userInfo.HomeDir)
 
 	cmd := &exec.Cmd{
 		Path: execPath,

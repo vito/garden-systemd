@@ -224,21 +224,8 @@ func (container *container) NetIn(hostPort, containerPort uint32) (uint32, uint3
 func (container *container) NetOut(garden.NetOutRule) error { return nil }
 
 func (container *container) Run(spec garden.ProcessSpec, processIO garden.ProcessIO) (garden.Process, error) {
-	if spec.User != "" {
-		spec.Env = append(spec.Env, "USER="+spec.User)
-	}
-
-	// set up a basic $PATH
-	if spec.Privileged {
-		spec.Env = append(
-			spec.Env,
-			"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
-		)
-	} else {
-		spec.Env = append(
-			spec.Env,
-			"PATH=/usr/local/bin:/usr/bin:/bin",
-		)
+	if spec.User == "" {
+		spec.User = "root"
 	}
 
 	wshdSock := path.Join(container.dir, "run", "wshd.sock")
@@ -258,6 +245,7 @@ func (container *container) Run(spec garden.ProcessSpec, processIO garden.Proces
 		Args: spec.Args,
 		Dir:  spec.Dir,
 		Env:  spec.Env,
+		User: spec.User,
 	}
 
 	if spec.TTY != nil {

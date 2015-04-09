@@ -28,6 +28,7 @@ type RunRequest struct {
 	Env  []string
 	Dir  string
 	TTY  *TTYSpec
+	User string
 }
 
 type TTYSpec struct {
