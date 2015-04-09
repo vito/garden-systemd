@@ -5,7 +5,7 @@ import (
 	"sync"
 
 	"github.com/vito/garden-systemd/ginit"
-	"github.com/vito/houdini/ptyutil"
+	"github.com/vito/garden-systemd/ptyutil"
 )
 
 type Process struct {
