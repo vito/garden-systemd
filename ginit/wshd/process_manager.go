@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
 	"net"
 	"os"
 	"os/exec"
@@ -45,7 +46,7 @@ func (mgr *ProcessManager) Run(conn net.Conn, req *ginit.RunRequest) {
 		execPath = bin
 	}
 
-	userInfo, err := user.Lookup(req.User)
+	userInfo, err := lookupUser(req.User)
 	if err != nil {
 		println("user lookup: " + err.Error())
 		respondErr(conn, err)
@@ -246,4 +247,26 @@ func (mgr *ProcessManager) CreateDir(conn net.Conn, req *ginit.CreateDirRequest)
 		println("failed to encode response: " + err.Error())
 		return
 	}
+}
+
+func lookupUser(name string) (*user.User, error) {
+	file, err := ioutil.ReadFile("/etc/passwd")
+	if err != nil {
+		return nil, err
+	}
+
+	for _, line := range strings.Split(string(file), "\n") {
+		data := strings.Split(line, ":")
+		if len(data) > 5 && (data[0] == name || data[2] == name) {
+			return &user.User{
+				Uid:      data[2],
+				Gid:      data[3],
+				Username: data[0],
+				Name:     data[4],
+				HomeDir:  data[5],
+			}, nil
+		}
+	}
+
+	return nil, fmt.Errorf("user %s not found", name)
 }
