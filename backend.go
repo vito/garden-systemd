@@ -89,11 +89,8 @@ func (backend *Backend) Create(spec garden.ContainerSpec) (garden.Container, err
 		return nil, err
 	}
 
-	var image string
 	switch rootfs.Scheme {
 	case "docker":
-		image = filepath.Base(rootfs.Path)
-
 		dockerIndex := "https://index.docker.io"
 		if rootfs.Host != "" {
 			dockerIndex = "https://" + rootfs.Host
