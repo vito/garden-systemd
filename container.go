@@ -74,7 +74,7 @@ func (container *container) Stop(kill bool) error {
 
 func (container *container) Info() (garden.ContainerInfo, error) { return garden.ContainerInfo{}, nil }
 
-func (container *container) StreamIn(dstPath string, tarStream io.Reader) error {
+func (container *container) StreamIn(spec garden.StreamInSpec) error {
 	streamDir, err := ioutil.TempDir(container.dir, "stream-in")
 	if err != nil {
 		return err
@@ -83,7 +83,7 @@ func (container *container) StreamIn(dstPath string, tarStream io.Reader) error 
 	defer os.RemoveAll(streamDir)
 
 	tarCmd := exec.Command("tar", "xf", "-", "-C", streamDir)
-	tarCmd.Stdin = tarStream
+	tarCmd.Stdin = spec.TarStream
 
 	err = run(tarCmd)
 	if err != nil {
@@ -104,7 +104,7 @@ func (container *container) StreamIn(dstPath string, tarStream io.Reader) error 
 
 	err = enc.Encode(ginit.Request{
 		CreateDir: &ginit.CreateDirRequest{
-			Path: dstPath,
+			Path: spec.Path,
 		},
 	})
 	if err != nil {
@@ -125,12 +125,12 @@ func (container *container) StreamIn(dstPath string, tarStream io.Reader) error 
 		return err
 	}
 
-	return run(exec.Command("machinectl", "copy-to", container.id, streamDir, dstPath))
+	return run(exec.Command("machinectl", "copy-to", container.id, streamDir, spec.Path))
 }
 
-func (container *container) StreamOut(srcPath string) (io.ReadCloser, error) {
-	if strings.HasSuffix(srcPath, "/") {
-		srcPath += "."
+func (container *container) StreamOut(spec garden.StreamOutSpec) (io.ReadCloser, error) {
+	if strings.HasSuffix(spec.Path, "/") {
+		spec.Path += "."
 	}
 
 	streamDirBase, err := ioutil.TempDir(container.dir, "stream-out")
@@ -139,9 +139,9 @@ func (container *container) StreamOut(srcPath string) (io.ReadCloser, error) {
 	}
 
 	// do NOT use path.Join; it strips out '/.'
-	streamDir := streamDirBase + "/" + path.Base(srcPath)
+	streamDir := streamDirBase + "/" + path.Base(spec.Path)
 
-	err = run(exec.Command("machinectl", "copy-from", container.id, srcPath, streamDir))
+	err = run(exec.Command("machinectl", "copy-from", container.id, spec.Path, streamDir))
 	if err != nil {
 		return nil, err
 	}
@@ -388,7 +388,7 @@ func (container *container) Attach(processID uint32, processIO garden.ProcessIO)
 	), nil
 }
 
-func (container *container) GetProperties() (garden.Properties, error) {
+func (container *container) Properties() (garden.Properties, error) {
 	props := garden.Properties{}
 
 	container.propertiesL.RLock()
@@ -400,7 +400,7 @@ func (container *container) GetProperties() (garden.Properties, error) {
 	return props, nil
 }
 
-func (container *container) GetProperty(name string) (string, error) {
+func (container *container) Property(name string) (string, error) {
 	container.propertiesL.RLock()
 	property, found := container.properties[name]
 	container.propertiesL.RUnlock()
