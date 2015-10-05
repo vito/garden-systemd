@@ -13,6 +13,7 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/cloudfoundry-incubator/garden"
 	"github.com/vito/garden-systemd/ginit"
@@ -37,11 +38,18 @@ type container struct {
 	propertiesL sync.RWMutex
 
 	env []string
+
+	graceTime  time.Duration
+	graceTimeL sync.RWMutex
 }
 
 func newContainer(spec garden.ContainerSpec, dir string, id string) *container {
 	if spec.Properties == nil {
 		spec.Properties = garden.Properties{}
+	}
+
+	if spec.GraceTime == 0 {
+		spec.GraceTime = 5 * time.Minute
 	}
 
 	return &container{
@@ -54,6 +62,8 @@ func newContainer(spec garden.ContainerSpec, dir string, id string) *container {
 		properties: spec.Properties,
 
 		env: spec.Env,
+
+		graceTime: spec.GraceTime,
 	}
 }
 
@@ -438,6 +448,13 @@ func (container *container) Metrics() (garden.Metrics, error) {
 	return garden.Metrics{}, nil
 }
 
+func (container *container) SetGraceTime(graceTime time.Duration) error {
+	container.graceTimeL.Lock()
+	container.graceTime = graceTime
+	container.graceTimeL.Unlock()
+	return nil
+}
+
 func (container *container) currentProperties() garden.Properties {
 	properties := garden.Properties{}
 
@@ -450,4 +467,10 @@ func (container *container) currentProperties() garden.Properties {
 	container.propertiesL.RUnlock()
 
 	return properties
+}
+
+func (container *container) currentGraceTime() time.Duration {
+	container.graceTimeL.RLock()
+	defer container.graceTimeL.RUnlock()
+	return container.graceTime
 }
