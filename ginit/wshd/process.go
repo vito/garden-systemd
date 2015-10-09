@@ -11,7 +11,7 @@ import (
 )
 
 type Process struct {
-	ID uint32
+	ID string
 
 	Process *os.Process
 

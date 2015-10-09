@@ -12,22 +12,19 @@ import (
 	"syscall"
 
 	"github.com/kr/pty"
+	"github.com/nu7hatch/gouuid"
 	"github.com/vito/garden-systemd/ginit"
 	"github.com/vito/garden-systemd/ptyutil"
 )
 
 func newProcessManager() *ProcessManager {
 	return &ProcessManager{
-		nextProcessID: 1,
-
-		processes: make(map[uint32]*Process),
+		processes: make(map[string]*Process),
 	}
 }
 
 type ProcessManager struct {
-	nextProcessID uint32
-
-	processes  map[uint32]*Process
+	processes  map[string]*Process
 	processesL sync.Mutex
 }
 
@@ -194,8 +191,15 @@ func (mgr *ProcessManager) Run(conn net.Conn, req *ginit.RunRequest) {
 	}
 
 	mgr.processesL.Lock()
-	process.ID = mgr.nextProcessID
-	mgr.nextProcessID++
+
+	processUUID, err := uuid.NewV4()
+	if err != nil {
+		println("failed to generate uuid: " + err.Error())
+		return
+	}
+
+	process.ID = processUUID.String()
+
 	mgr.processes[process.ID] = process
 	mgr.processesL.Unlock()
 

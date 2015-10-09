@@ -14,7 +14,7 @@ import (
 )
 
 type initProcess struct {
-	processID uint32
+	processID string
 
 	copying *sync.WaitGroup
 	statusR *os.File
@@ -23,7 +23,7 @@ type initProcess struct {
 }
 
 func attachProcess(
-	processID uint32,
+	processID string,
 	processIO garden.ProcessIO,
 	rights ginit.FDRights,
 	fds []int,
@@ -94,7 +94,7 @@ func attachProcess(
 	return process
 }
 
-func (p *initProcess) ID() uint32 {
+func (p *initProcess) ID() string {
 	return p.processID
 }
 

@@ -138,12 +138,12 @@ func (rights FDRights) UnixRights() []byte {
 }
 
 type RunResponse struct {
-	ProcessID uint32
+	ProcessID string
 	Rights    FDRights
 }
 
 type AttachRequest struct {
-	ProcessID uint32
+	ProcessID string
 }
 
 type AttachResponse struct {
@@ -151,14 +151,14 @@ type AttachResponse struct {
 }
 
 type SignalRequest struct {
-	ProcessID uint32
+	ProcessID string
 	Signal    os.Signal
 }
 
 type SignalResponse struct{}
 
 type SetWindowSizeRequest struct {
-	ProcessID uint32
+	ProcessID string
 	Columns   int
 	Rows      int
 }
@@ -172,7 +172,7 @@ type CreateDirRequest struct {
 type CreateDirResponse struct{}
 
 type CloseStdinRequest struct {
-	ProcessID uint32
+	ProcessID string
 }
 
 type CloseStdinResponse struct{}

@@ -324,7 +324,7 @@ func (container *container) Run(spec garden.ProcessSpec, processIO garden.Proces
 	), nil
 }
 
-func (container *container) Attach(processID uint32, processIO garden.ProcessIO) (garden.Process, error) {
+func (container *container) Attach(processID string, processIO garden.ProcessIO) (garden.Process, error) {
 	wshdSock := path.Join(container.dir, "run", "wshd.sock")
 
 	conn, err := net.Dial("unix", wshdSock)
