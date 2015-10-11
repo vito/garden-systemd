@@ -2,7 +2,7 @@
 Description=Garden Container %I
 
 [Service]
-ExecStart=/usr/bin/systemd-nspawn --capability=all --machine=%I --quiet --keep-unit --bind /var/lib/garden/container-%I/run:/tmp/garden-init -- /sbin/wshd --run /tmp/garden-init
+ExecStart=/usr/bin/systemd-nspawn --capability=all --machine=%I --quiet --keep-unit --bind /var/lib/garden/container-%I/run:/tmp/garden-init --bind /var/lib/garden/container-%I/bin/wshd:/sbin/wshd -- /sbin/wshd --run /tmp/garden-init
 Type=notify
 KillMode=mixed
 TimeoutStopSec=10

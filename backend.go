@@ -166,19 +166,13 @@ func (backend *Backend) Create(spec garden.ContainerSpec) (garden.Container, err
 		return nil, err
 	}
 
+	err = run(exec.Command("cp", "-a", filepath.Join(backend.skeletonDir, "bin", "wshd"), filepath.Join(binDir, "wshd")))
+	if err != nil {
+		return nil, err
+	}
+
 	// clear out any existing resolv.conf
 	err = os.RemoveAll(filepath.Join("/var/lib/machines", id, "etc", "resolv.conf"))
-	if err != nil {
-		return nil, err
-	}
-
-	sbinDir := filepath.Join("/var/lib/machines", id, "sbin")
-	err = os.MkdirAll(sbinDir, 0755)
-	if err != nil {
-		return nil, err
-	}
-
-	err = run(exec.Command("cp", "-a", filepath.Join(backend.skeletonDir, "bin", "wshd"), filepath.Join(sbinDir, "wshd")))
 	if err != nil {
 		return nil, err
 	}
