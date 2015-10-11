@@ -126,6 +126,13 @@ func (backend *Backend) Create(spec garden.ContainerSpec) (garden.Container, err
 		if err != nil {
 			return nil, err
 		}
+
+	case "":
+		err := os.Symlink(rootfs.Path, "/var/lib/machines/"+id)
+		if err != nil {
+			return nil, err
+		}
+
 	default:
 		return nil, fmt.Errorf("unsupported rootfs scheme: %s", rootfs.Scheme)
 	}
