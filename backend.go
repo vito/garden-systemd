@@ -191,7 +191,7 @@ func (backend *Backend) Create(spec garden.ContainerSpec) (garden.Container, err
 	}()
 
 	for i := 0; i < 10; i++ {
-		err := run(exec.Command("machinectl", "status", id))
+		err = run(exec.Command("machinectl", "status", id))
 		if err == nil {
 			break
 		}
