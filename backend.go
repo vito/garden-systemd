@@ -137,6 +137,15 @@ func (backend *Backend) Create(spec garden.ContainerSpec) (garden.Container, err
 		return nil, fmt.Errorf("unsupported rootfs scheme: %s", rootfs.Scheme)
 	}
 
+	var created bool
+	defer func() {
+		if !created {
+			if err := backend.removeMachine(id); err != nil {
+				log.Println("failed to cleanup image:", err)
+			}
+		}
+	}()
+
 	dir := filepath.Join(backend.containersDir, "container-"+id)
 
 	container := newContainer(spec, dir, id)
@@ -166,30 +175,26 @@ func (backend *Backend) Create(spec garden.ContainerSpec) (garden.Container, err
 	sbinDir := filepath.Join("/var/lib/machines", id, "sbin")
 	err = os.MkdirAll(sbinDir, 0755)
 	if err != nil {
-		if err := run(exec.Command("machinectl", "remove", id)); err != nil {
-			log.Println("failed to cleanup image:", err)
-		}
-
 		return nil, err
 	}
 
 	err = run(exec.Command("cp", "-a", filepath.Join(backend.skeletonDir, "bin", "wshd"), filepath.Join(sbinDir, "wshd")))
 	if err != nil {
-		if err := run(exec.Command("machinectl", "remove", id)); err != nil {
-			log.Println("failed to cleanup image:", err)
-		}
-
 		return nil, err
 	}
 
 	err = run(exec.Command("systemctl", "start", "garden-container@"+id))
 	if err != nil {
-		if err := run(exec.Command("machinectl", "remove", id)); err != nil {
-			log.Println("failed to cleanup image:", err)
-		}
-
 		return nil, err
 	}
+
+	defer func() {
+		if !created {
+			if err := run(exec.Command("systemctl", "stop", "garden-container@"+id)); err != nil {
+				log.Println("failed to cleanup container:", err)
+			}
+		}
+	}()
 
 	for i := 0; i < 10; i++ {
 		err := run(exec.Command("machinectl", "status", id))
@@ -201,20 +206,14 @@ func (backend *Backend) Create(spec garden.ContainerSpec) (garden.Container, err
 	}
 
 	if err != nil {
-		if err := run(exec.Command("systemctl", "stop", "garden-container@"+id)); err != nil {
-			log.Println("failed to cleanup container:", err)
-		}
-
-		if err := run(exec.Command("machinectl", "remove", id)); err != nil {
-			log.Println("failed to cleanup image:", err)
-		}
-
 		return nil, fmt.Errorf("container did not come up")
 	}
 
 	backend.containersL.Lock()
 	backend.containers[spec.Handle] = container
 	backend.containersL.Unlock()
+
+	created = true
 
 	return container, nil
 }
@@ -234,7 +233,7 @@ func (backend *Backend) Destroy(handle string) error {
 	}
 
 	for i := 0; i < 10; i++ {
-		err = run(exec.Command("machinectl", "remove", container.id))
+		err := backend.removeMachine(container.id)
 		if err == nil {
 			break
 		}
@@ -292,6 +291,18 @@ func (backend *Backend) BulkInfo(handles []string) (map[string]garden.ContainerI
 
 func (backend *Backend) BulkMetrics(handles []string) (map[string]garden.ContainerMetricsEntry, error) {
 	return map[string]garden.ContainerMetricsEntry{}, nil
+}
+
+func (backend *Backend) removeMachine(id string) error {
+	machineDir := "/var/lib/machines" + id
+
+	_, symlinkErr := os.Readlink(machineDir)
+
+	if symlinkErr == nil {
+		return os.Remove(machineDir)
+	} else {
+		return run(exec.Command("machinectl", "remove", id))
+	}
 }
 
 func (backend *Backend) generateContainerID() string {
