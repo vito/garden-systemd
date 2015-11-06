@@ -177,6 +177,20 @@ func (backend *Backend) Create(spec garden.ContainerSpec) (garden.Container, err
 		return nil, err
 	}
 
+	// create sbin/wshd to fool nspawn validation
+	sbinDir := filepath.Join("/var/lib/machines", id, "sbin")
+	err = os.MkdirAll(sbinDir, 0755)
+	if err != nil {
+		return nil, err
+	}
+
+	wshdIsh, err := os.Create(filepath.Join(sbinDir, "wshd"))
+	if err != nil {
+		return nil, err
+	}
+
+	wshdIsh.Close()
+
 	err = run(exec.Command("systemctl", "start", "garden-container@"+id))
 	if err != nil {
 		return nil, err
@@ -294,9 +308,9 @@ func (backend *Backend) removeMachine(id string) error {
 
 	if symlinkErr == nil {
 		return os.Remove(machineDir)
-	} else {
-		return run(exec.Command("machinectl", "remove", id))
 	}
+
+	return run(exec.Command("machinectl", "remove", id))
 }
 
 func (backend *Backend) generateContainerID() string {
