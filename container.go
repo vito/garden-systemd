@@ -85,6 +85,8 @@ func (container *container) Stop(kill bool) error {
 func (container *container) Info() (garden.ContainerInfo, error) { return garden.ContainerInfo{}, nil }
 
 func (container *container) StreamIn(spec garden.StreamInSpec) error {
+	destDir := strings.TrimRight(spec.Path, "/")
+
 	streamDir, err := ioutil.TempDir(container.dir, "stream-in")
 	if err != nil {
 		return err
@@ -114,7 +116,7 @@ func (container *container) StreamIn(spec garden.StreamInSpec) error {
 
 	err = enc.Encode(ginit.Request{
 		CreateDir: &ginit.CreateDirRequest{
-			Path: spec.Path,
+			Path: destDir,
 		},
 	})
 	if err != nil {
@@ -135,7 +137,7 @@ func (container *container) StreamIn(spec garden.StreamInSpec) error {
 		return err
 	}
 
-	return run(exec.Command("machinectl", "copy-to", container.id, streamDir, spec.Path))
+	return run(exec.Command("machinectl", "copy-to", container.id, streamDir, destDir))
 }
 
 func (container *container) StreamOut(spec garden.StreamOutSpec) (io.ReadCloser, error) {
