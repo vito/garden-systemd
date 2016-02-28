@@ -5,9 +5,7 @@
 * running processes behaves the same as garden linux (wsh <-> wshd)
 
 * container rootfs is initialized via machinectl clone, providing efficient
-  copy-on-write. currently this only works on btrfs.
-
-* docker images will be supported via a `machinectl pull-dkr`
+  copy-on-write.
 
 * stream in/out will have to have an extra step for the tar/untarring, since
   systemd only supports copying dirs local to the server, and doing bind-mounts

@@ -10,7 +10,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -90,43 +89,6 @@ func (backend *Backend) Create(spec garden.ContainerSpec) (garden.Container, err
 	}
 
 	switch rootfs.Scheme {
-	case "docker":
-		dockerIndex := "https://index.docker.io"
-		if rootfs.Host != "" {
-			dockerIndex = "https://" + rootfs.Host
-		}
-
-		tag := "latest"
-		if rootfs.Fragment != "" {
-			tag = rootfs.Fragment
-		}
-
-		var repo string
-		pathSegs := strings.Split(rootfs.Path, "/")
-		if len(pathSegs) == 0 {
-			return nil, fmt.Errorf("invalid docker uri")
-		}
-
-		// drop leading /
-		pathSegs = pathSegs[1:]
-		if len(pathSegs) == 1 {
-			repo = "library/" + pathSegs[0]
-		} else {
-			repo = strings.Join(pathSegs, "/")
-		}
-
-		err = run(exec.Command(
-			"machinectl",
-			"pull-dkr",
-			"--verify", "no",
-			"--dkr-index-url", dockerIndex,
-			repo+":"+tag,
-			id,
-		))
-		if err != nil {
-			return nil, err
-		}
-
 	case "":
 		err := os.Symlink(rootfs.Path, "/var/lib/machines/"+id)
 		if err != nil {
