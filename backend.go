@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -82,13 +83,6 @@ func (backend *Backend) Create(spec garden.ContainerSpec) (garden.Container, err
 		spec.Handle = id
 	}
 
-	baseImage := spec.RootFSPath
-
-	err := run(exec.Command("machinectl", "clone", baseImage, id))
-	if err != nil {
-		return nil, err
-	}
-
 	var created bool
 	defer func() {
 		if !created {
@@ -99,6 +93,14 @@ func (backend *Backend) Create(spec garden.ContainerSpec) (garden.Container, err
 	}()
 
 	dir := filepath.Join(backend.containersDir, "container-"+id)
+
+	start := fmt.Sprintf(`#!/bin/sh
+exec /usr/bin/systemd-nspawn --capability=all --machine=%[1]s --directory '%[2]s' --quiet --keep-unit --bind /var/lib/garden/container-%[1]s/run:/tmp/garden-init --bind /var/lib/garden/container-%[1]s/bin/wshd:/sbin/wshd -- /sbin/wshd --run /tmp/garden-init`, id, spec.RootFSPath)
+
+	err := ioutil.WriteFile(filepath.Join(dir, "start"), []byte(start), 0755)
+	if err != nil {
+		return nil, err
+	}
 
 	container := newContainer(spec, dir, id)
 
