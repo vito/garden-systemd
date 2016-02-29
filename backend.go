@@ -76,35 +76,32 @@ func (backend *Backend) Capacity() (garden.Capacity, error) {
 	return garden.Capacity{}, nil
 }
 
+var ErrNoRootFS = errors.New("no rootfs path specified")
+
 func (backend *Backend) Create(spec garden.ContainerSpec) (garden.Container, error) {
+	if spec.RootFSPath == "" {
+		return nil, ErrNoRootFS
+	}
+
 	id := backend.generateContainerID()
 
 	if spec.Handle == "" {
 		spec.Handle = id
 	}
 
-	var created bool
-	defer func() {
-		if !created {
-			if err := backend.removeMachine(id); err != nil {
-				log.Println("failed to cleanup image:", err)
-			}
-		}
-	}()
-
 	dir := filepath.Join(backend.containersDir, "container-"+id)
 
-	start := fmt.Sprintf(`#!/bin/sh
-exec /usr/bin/systemd-nspawn --capability=all --machine=%[1]s --directory '%[2]s' --quiet --keep-unit --bind /var/lib/garden/container-%[1]s/run:/tmp/garden-init --bind /var/lib/garden/container-%[1]s/bin/wshd:/sbin/wshd -- /sbin/wshd --run /tmp/garden-init`, id, spec.RootFSPath)
+	container := newContainer(spec, dir, id)
 
-	err := ioutil.WriteFile(filepath.Join(dir, "start"), []byte(start), 0755)
+	err := os.MkdirAll(dir, 0755)
 	if err != nil {
 		return nil, err
 	}
 
-	container := newContainer(spec, dir, id)
+	start := fmt.Sprintf(`#!/bin/sh
+exec /usr/bin/systemd-nspawn --capability=all --machine=%[1]s --directory '%[2]s' --quiet --keep-unit --bind /var/lib/garden/container-%[1]s/run:/tmp/garden-init --bind /var/lib/garden/container-%[1]s/bin/wshd:/sbin/wshd -- /sbin/wshd --run /tmp/garden-init`, id, spec.RootFSPath)
 
-	err = os.MkdirAll(dir, 0755)
+	err = ioutil.WriteFile(filepath.Join(dir, "start"), []byte(start), 0755)
 	if err != nil {
 		return nil, err
 	}
@@ -126,13 +123,13 @@ exec /usr/bin/systemd-nspawn --capability=all --machine=%[1]s --directory '%[2]s
 	}
 
 	// clear out any existing resolv.conf
-	err = os.RemoveAll(filepath.Join("/var/lib/machines", id, "etc", "resolv.conf"))
+	err = os.RemoveAll(filepath.Join(spec.RootFSPath, "etc", "resolv.conf"))
 	if err != nil {
 		return nil, err
 	}
 
-	// create sbin/wshd to fool nspawn validation
-	sbinDir := filepath.Join("/var/lib/machines", id, "sbin")
+	// create sbin/wshd in rootfs to fool nspawn validation
+	sbinDir := filepath.Join(spec.RootFSPath, "sbin")
 	err = os.MkdirAll(sbinDir, 0755)
 	if err != nil {
 		return nil, err
@@ -149,6 +146,8 @@ exec /usr/bin/systemd-nspawn --capability=all --machine=%[1]s --directory '%[2]s
 	if err != nil {
 		return nil, err
 	}
+
+	created := false
 
 	defer func() {
 		if !created {
@@ -190,19 +189,6 @@ func (backend *Backend) Destroy(handle string) error {
 	}
 
 	err := run(exec.Command("systemctl", "stop", "garden-container@"+container.id))
-	if err != nil {
-		return err
-	}
-
-	for i := 0; i < 10; i++ {
-		err := backend.removeMachine(container.id)
-		if err == nil {
-			break
-		}
-
-		time.Sleep(time.Second)
-	}
-
 	if err != nil {
 		return err
 	}
@@ -253,18 +239,6 @@ func (backend *Backend) BulkInfo(handles []string) (map[string]garden.ContainerI
 
 func (backend *Backend) BulkMetrics(handles []string) (map[string]garden.ContainerMetricsEntry, error) {
 	return map[string]garden.ContainerMetricsEntry{}, nil
-}
-
-func (backend *Backend) removeMachine(id string) error {
-	machineDir := "/var/lib/machines" + id
-
-	_, symlinkErr := os.Readlink(machineDir)
-
-	if symlinkErr == nil {
-		return os.Remove(machineDir)
-	}
-
-	return run(exec.Command("machinectl", "remove", id))
 }
 
 func (backend *Backend) generateContainerID() string {
