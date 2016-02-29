@@ -51,21 +51,40 @@ func (mgr *ProcessManager) Run(conn net.Conn, req *ginit.RunRequest) {
 
 	env := req.Env
 
-	// set up a basic $PATH
-	if req.User == "root" {
-		env = append(
-			env,
-			"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
-		)
-	} else {
-		env = append(
-			env,
-			"PATH=/usr/local/bin:/usr/bin:/bin",
-		)
+	var hasPATH, hasUSER, hasHOME bool
+
+	for _, e := range req.Env {
+		if strings.HasPrefix(e, "PATH=") {
+			hasPATH = true
+		} else if strings.HasPrefix(e, "USER=") {
+			hasUSER = true
+		} else if strings.HasPrefix(e, "HOME=") {
+			hasHOME = true
+		}
 	}
 
-	env = append(env, "USER="+req.User)
-	env = append(env, "HOME="+userInfo.HomeDir)
+	if !hasPATH {
+		// set up a basic $PATH
+		if req.User == "root" {
+			env = append(
+				env,
+				"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+			)
+		} else {
+			env = append(
+				env,
+				"PATH=/usr/local/bin:/usr/bin:/bin",
+			)
+		}
+	}
+
+	if !hasUSER {
+		env = append(env, "USER="+req.User)
+	}
+
+	if !hasHOME {
+		env = append(env, "HOME="+userInfo.HomeDir)
+	}
 
 	var uid, gid uint32
 	_, err = fmt.Sscanf(userInfo.Uid, "%d", &uid)
