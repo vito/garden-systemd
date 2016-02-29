@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -98,8 +99,35 @@ func (backend *Backend) Create(spec garden.ContainerSpec) (garden.Container, err
 		return nil, err
 	}
 
-	start := fmt.Sprintf(`#!/bin/sh
-exec /usr/bin/systemd-nspawn --capability=all --machine=%[1]s --directory '%[2]s' --ephemeral --quiet --keep-unit --bind /var/lib/garden/container-%[1]s/run:/tmp/garden-init --bind /var/lib/garden/container-%[1]s/bin/wshd:/sbin/wshd -- /sbin/wshd --run /tmp/garden-init`, id, spec.RootFSPath)
+	nspawnFlags := []string{}
+
+	for _, mount := range spec.BindMounts {
+		switch mount.Mode {
+		case garden.BindMountModeRO:
+			nspawnFlags = append(nspawnFlags, "--bind-ro", mount.SrcPath+":"+mount.DstPath)
+		case garden.BindMountModeRW:
+			nspawnFlags = append(nspawnFlags, "--bind", mount.SrcPath+":"+mount.DstPath)
+		}
+	}
+
+	start := fmt.Sprintf(
+		`#!/bin/sh
+
+exec /usr/bin/systemd-nspawn \
+	--capability all \
+	--machine %[1]s \
+	--directory '%[2]s' \
+	--ephemeral \
+	--quiet \
+	--keep-unit \
+	--bind /var/lib/garden/container-%[1]s/run:/tmp/garden-init \
+	--bind /var/lib/garden/container-%[1]s/bin/wshd:/sbin/wshd \
+	%[3]s \
+	-- /sbin/wshd --run /tmp/garden-init`,
+		id,
+		spec.RootFSPath,
+		strings.Join(nspawnFlags, " "),
+	)
 
 	err = ioutil.WriteFile(filepath.Join(dir, "start"), []byte(start), 0755)
 	if err != nil {
