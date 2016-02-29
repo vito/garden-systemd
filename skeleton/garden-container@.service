@@ -2,7 +2,7 @@
 Description=Garden Container %I
 
 [Service]
-ExecStart=/var/lib/garden/container-%I/start
+ExecStart=/bin/sh /var/lib/garden/container-%I/start
 Type=notify
 KillMode=mixed
 TimeoutStopSec=10
