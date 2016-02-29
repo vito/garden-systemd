@@ -251,7 +251,7 @@ func (container *container) Run(spec garden.ProcessSpec, processIO garden.Proces
 		Path: spec.Path,
 		Args: spec.Args,
 		Dir:  spec.Dir,
-		Env:  spec.Env,
+		Env:  append(container.env, spec.Env...),
 		User: spec.User,
 	}
 
