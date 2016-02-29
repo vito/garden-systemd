@@ -7,7 +7,6 @@ import (
 	"io"
 	"net"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"syscall"
 
@@ -51,27 +50,6 @@ func main() {
 	err = os.RemoveAll(*runDir)
 	if err != nil {
 		println("cleanup run dir: " + err.Error())
-		os.Exit(1)
-	}
-
-	find := exec.Command("find", "/tmp")
-	find.Stdout = os.Stdout
-	find.Stderr = os.Stderr
-	find.Run()
-
-	umount := exec.Command("umount", "-l", "/tmp")
-	umount.Stdout = os.Stdout
-	umount.Stderr = os.Stderr
-
-	err = umount.Run()
-	if err != nil {
-		println("failed to clean up /tmp: " + err.Error())
-		os.Exit(1)
-	}
-
-	err = os.Chmod("/tmp", 0777)
-	if err != nil {
-		println("failed to set /tmp permissions: " + err.Error())
 		os.Exit(1)
 	}
 

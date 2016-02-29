@@ -120,6 +120,7 @@ exec /usr/bin/systemd-nspawn \
 	--ephemeral \
 	--quiet \
 	--keep-unit \
+	--bind /var/lib/garden/container-%[1]s/tmp:/tmp \
 	--bind /var/lib/garden/container-%[1]s/run:/tmp/garden-init \
 	--bind /var/lib/garden/container-%[1]s/bin/wshd:/sbin/wshd \
 	%[3]s \
@@ -136,12 +137,17 @@ exec /usr/bin/systemd-nspawn \
 
 	runDir := filepath.Join(dir, "run")
 	binDir := filepath.Join(dir, "bin")
+	tmpDir := filepath.Join(dir, "tmp")
 
 	if err := os.MkdirAll(runDir, 0755); err != nil {
 		return nil, err
 	}
 
 	if err := os.MkdirAll(binDir, 0755); err != nil {
+		return nil, err
+	}
+
+	if err := os.MkdirAll(tmpDir, 0777); err != nil {
 		return nil, err
 	}
 
