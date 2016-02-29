@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -83,20 +82,11 @@ func (backend *Backend) Create(spec garden.ContainerSpec) (garden.Container, err
 		spec.Handle = id
 	}
 
-	rootfs, err := url.Parse(spec.RootFSPath)
+	baseImage := spec.RootFSPath
+
+	err := run(exec.Command("machinectl", "clone", baseImage, id))
 	if err != nil {
 		return nil, err
-	}
-
-	switch rootfs.Scheme {
-	case "":
-		err := os.Symlink(rootfs.Path, "/var/lib/machines/"+id)
-		if err != nil {
-			return nil, err
-		}
-
-	default:
-		return nil, fmt.Errorf("unsupported rootfs scheme: %s", rootfs.Scheme)
 	}
 
 	var created bool
