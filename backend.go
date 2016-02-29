@@ -99,7 +99,7 @@ func (backend *Backend) Create(spec garden.ContainerSpec) (garden.Container, err
 	}
 
 	start := fmt.Sprintf(`#!/bin/sh
-exec /usr/bin/systemd-nspawn --capability=all --machine=%[1]s --directory '%[2]s' --quiet --keep-unit --bind /var/lib/garden/container-%[1]s/run:/tmp/garden-init --bind /var/lib/garden/container-%[1]s/bin/wshd:/sbin/wshd -- /sbin/wshd --run /tmp/garden-init`, id, spec.RootFSPath)
+exec /usr/bin/systemd-nspawn --capability=all --machine=%[1]s --template '%[2]s' --quiet --keep-unit --bind /var/lib/garden/container-%[1]s/run:/tmp/garden-init --bind /var/lib/garden/container-%[1]s/bin/wshd:/sbin/wshd -- /sbin/wshd --run /tmp/garden-init`, id, spec.RootFSPath)
 
 	err = ioutil.WriteFile(filepath.Join(dir, "start"), []byte(start), 0755)
 	if err != nil {
