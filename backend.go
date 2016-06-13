@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -110,6 +111,15 @@ func (backend *Backend) Create(spec garden.ContainerSpec) (garden.Container, err
 		}
 	}
 
+	rootfsURL, err := url.Parse(spec.RootFSPath)
+	if err != nil {
+		return nil, fmt.Errorf("invalid rootfs URI: %s", spec.RootFSPath)
+	}
+
+	if rootfsURL.Scheme != "raw" {
+		return nil, fmt.Errorf("unsupported rootfs URI (only raw:// supported): %s", spec.RootFSPath)
+	}
+
 	start := fmt.Sprintf(
 		`#!/bin/sh
 
@@ -126,7 +136,7 @@ exec /usr/bin/systemd-nspawn \
 	%[3]s \
 	-- /sbin/wshd --run /tmp/garden-init`,
 		id,
-		spec.RootFSPath,
+		rootfsURL.Path,
 		strings.Join(nspawnFlags, " "),
 	)
 
@@ -157,13 +167,13 @@ exec /usr/bin/systemd-nspawn \
 	}
 
 	// clear out any existing resolv.conf
-	err = os.RemoveAll(filepath.Join(spec.RootFSPath, "etc", "resolv.conf"))
+	err = os.RemoveAll(filepath.Join(rootfsURL.Path, "etc", "resolv.conf"))
 	if err != nil {
 		return nil, err
 	}
 
 	// create sbin/wshd in rootfs to fool nspawn validation
-	sbinDir := filepath.Join(spec.RootFSPath, "sbin")
+	sbinDir := filepath.Join(rootfsURL.Path, "sbin")
 	err = os.MkdirAll(sbinDir, 0755)
 	if err != nil {
 		return nil, err
