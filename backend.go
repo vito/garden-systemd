@@ -19,10 +19,6 @@ import (
 	"code.cloudfoundry.org/garden"
 )
 
-var (
-	ErrContainerNotFound = errors.New("container not found")
-)
-
 type Backend struct {
 	containersDir string
 	skeletonDir   string
@@ -229,7 +225,7 @@ func (backend *Backend) Destroy(handle string) error {
 	backend.containersL.RUnlock()
 
 	if !found {
-		return ErrContainerNotFound
+		return garden.ContainerNotFoundError{Handle: handle}
 	}
 
 	err := run(exec.Command("systemctl", "stop", "garden-container@"+container.id))
@@ -271,7 +267,7 @@ func (backend *Backend) Lookup(handle string) (garden.Container, error) {
 	backend.containersL.RUnlock()
 
 	if !found {
-		return nil, ErrContainerNotFound
+		return nil, garden.ContainerNotFoundError{Handle: handle}
 	}
 
 	return container, nil
