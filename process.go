@@ -9,7 +9,7 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/cloudfoundry-incubator/garden"
+	"code.cloudfoundry.org/garden"
 	"github.com/vito/garden-systemd/ginit"
 )
 

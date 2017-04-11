@@ -15,7 +15,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/cloudfoundry-incubator/garden"
+	"code.cloudfoundry.org/garden"
 	"github.com/vito/garden-systemd/ginit"
 )
 
@@ -229,6 +229,8 @@ func (container *container) NetIn(hostPort, containerPort uint32) (uint32, uint3
 }
 
 func (container *container) NetOut(garden.NetOutRule) error { return nil }
+
+func (container *container) BulkNetOut([]garden.NetOutRule) error { return nil }
 
 func (container *container) Run(spec garden.ProcessSpec, processIO garden.ProcessIO) (garden.Process, error) {
 	if spec.User == "" {

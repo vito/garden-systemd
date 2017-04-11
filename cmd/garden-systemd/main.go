@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"syscall"
 
-	"github.com/cloudfoundry-incubator/garden/server"
-	"github.com/pivotal-golang/lager"
+	"code.cloudfoundry.org/garden/server"
+	"code.cloudfoundry.org/lager"
 	"github.com/vito/garden-systemd"
 )
 
